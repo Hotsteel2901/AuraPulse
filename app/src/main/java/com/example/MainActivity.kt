@@ -46,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,7 +67,8 @@ import com.example.data.local.OfflineVaultDatabase
 import com.example.data.local.OfflineVaultRepository
 import com.example.data.remote.CustomMusicSourceBridge
 import com.example.data.repository.AuraFirestoreRepository
-import com.example.ui.auth.AuraAuthScreen
+import com.example.ui.auth.AuraAccountSession
+import com.example.ui.auth.AuthProviderType
 import com.example.ui.auth.authStateFlow
 import com.example.ui.auth.signOut
 import com.example.ui.i18n.AppLanguage
@@ -98,22 +100,14 @@ class MainActivity : ComponentActivity() {
 fun AuraPulseApp(auth: FirebaseAuth = Firebase.auth) {
   val currentUser by
     auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
-  val user = currentUser
 
-  if (user == null) {
-    val defaultStrings = remember { resolveAuraStrings("SYSTEM") }
-    CompositionLocalProvider(LocalAuraStrings provides defaultStrings) {
-      AuraPulseTheme { AuraAuthScreen(onAuthSuccess = {}) }
-    }
-  } else {
-    AuthenticatedAuraShell(currentUserId = user.uid, userEmail = user.email)
-  }
+  // Launches directly into the full Local-First Studio Shell without any mandatory login gate.
+  AuraStudioShell(firebaseUser = currentUser)
 }
 
 @Composable
-private fun AuthenticatedAuraShell(
-  currentUserId: String,
-  userEmail: String?,
+private fun AuraStudioShell(
+  firebaseUser: com.google.firebase.auth.FirebaseUser?,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -121,7 +115,7 @@ private fun AuthenticatedAuraShell(
 
   val viewModel: AuraPlayerViewModel =
     viewModel(
-      key = currentUserId,
+      key = "aura_studio_main_vm",
       factory =
         viewModelFactory {
           initializer {
@@ -136,11 +130,31 @@ private fun AuthenticatedAuraShell(
               firestoreRepository = AuraFirestoreRepository(db),
               offlineVaultRepository = OfflineVaultRepository(roomDb.offlineTrackDao(), app),
               customSourceBridge = CustomMusicSourceBridge(),
-              currentUserId = currentUserId,
+              currentUserId = firebaseUser?.uid ?: "local_studio_user",
             )
           }
         },
     )
+
+  // Synchronize Firebase Auth state changes if the user signs in with Google or GitHub OAuth
+  LaunchedEffect(firebaseUser?.uid) {
+    if (firebaseUser != null) {
+      val providerIds = firebaseUser.providerData.map { it.providerId }
+      val isGitHub = providerIds.any { it.contains("github", ignoreCase = true) }
+      viewModel.updateAccountSession(
+        AuraAccountSession(
+          uid = firebaseUser.uid,
+          displayName =
+            firebaseUser.displayName
+              ?: firebaseUser.email?.substringBefore("@")
+              ?: "Authenticated Studio User",
+          handleOrEmail = firebaseUser.email ?: firebaseUser.uid,
+          provider = if (isGitHub) AuthProviderType.GITHUB else AuthProviderType.GOOGLE,
+          isFirebaseCloudAuthenticated = true,
+        )
+      )
+    }
+  }
 
   val playerState by viewModel.playerState.collectAsStateWithLifecycle()
   val tracks by viewModel.tracksState.collectAsStateWithLifecycle()
@@ -173,12 +187,14 @@ private fun AuthenticatedAuraShell(
               languageCode = playerState.appLanguageCode,
               regionCode = playerState.selectedGlobalRegion,
               sampleRateKhz = playerState.targetSampleRateKhz,
+              accountProvider = playerState.accountSession.provider,
               onCycleLanguage = {
                 val ordered = listOf("SYSTEM", "zh-CN", "zh-TW", "en", "ja", "ko")
                 val idx = ordered.indexOfFirst { it.equals(playerState.appLanguageCode, true) }
                 val next = ordered[(idx + 1).mod(ordered.size)]
                 viewModel.selectAppLanguage(next)
               },
+              onOpenAccountOrSync = { viewModel.selectDestination(AuraDestination.CLOUD_SYNC) },
               onOpenConfigAbout = { viewModel.selectDestination(AuraDestination.CONFIG_ABOUT) },
             )
           },
@@ -298,7 +314,6 @@ private fun AuthenticatedAuraShell(
                         allTracks = tracks,
                         customSourcesState = customSourcesState,
                         syncStatesState = syncStatesState,
-                        userEmail = userEmail,
                         onSelectGlobalRegion = viewModel::selectGlobalRegion,
                         onAddCustomSource = viewModel::addCustomMusicSource,
                         onAddKnownTemplate = viewModel::addKnownTemplateSource,
@@ -310,14 +325,16 @@ private fun AuthenticatedAuraShell(
                         onResumeFromSyncedDevice = viewModel::resumeFromSyncedDevice,
                         onToggleOfflineDownload = viewModel::toggleTrackOfflineDownload,
                         onPlayTrack = viewModel::selectAndPlayTrack,
+                        onSessionUpdated = viewModel::updateAccountSession,
                         onSignOut = {
                           signOut(
                             context = context,
                             credentialManager = credentialManager,
-                            onSignOutComplete = {},
+                            onSignOutComplete = { viewModel.handleSignOutToLocalMode() },
                             scope = scope,
                           )
                         },
+                        onShowStatusMessage = viewModel::showStatusMessage,
                         onBackToDeck = { viewModel.selectDestination(AuraDestination.DECK) },
                       )
 
@@ -354,7 +371,9 @@ private fun StudioQuickStatusHeader(
   languageCode: String,
   regionCode: String,
   sampleRateKhz: Int,
+  accountProvider: AuthProviderType,
   onCycleLanguage: () -> Unit,
+  onOpenAccountOrSync: () -> Unit,
   onOpenConfigAbout: () -> Unit,
 ) {
   val langBadge = remember(languageCode) { AppLanguage.fromCode(languageCode).badge }
@@ -412,9 +431,17 @@ private fun StudioQuickStatusHeader(
         Surface(
           color = MaterialTheme.colorScheme.surfaceVariant,
           shape = RoundedCornerShape(50),
+          modifier =
+            Modifier.clickable(onClick = onOpenAccountOrSync)
+              .testTag("top_bar_account_mode_chip"),
         ) {
           Text(
-            text = "${sampleRateKhz}kHz • $regionCode",
+            text =
+              when (accountProvider) {
+                AuthProviderType.GOOGLE -> "Google • $regionCode"
+                AuthProviderType.GITHUB -> "GitHub • $regionCode"
+                AuthProviderType.LOCAL_GUEST -> "${sampleRateKhz}kHz • $regionCode"
+              },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),

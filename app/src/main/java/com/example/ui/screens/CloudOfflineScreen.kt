@@ -18,9 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Devices
@@ -39,7 +37,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -59,6 +56,8 @@ import com.example.data.model.OfflineTrackEntity
 import com.example.data.model.SyncState
 import com.example.data.remote.CustomMusicSourceBridge
 import com.example.data.remote.KnownApiTemplate
+import com.example.ui.auth.AuraAccountSession
+import com.example.ui.auth.OptionalAccountSyncCard
 import com.example.ui.i18n.LocalAuraStrings
 import com.example.ui.viewmodel.PlayerUiState
 import com.example.ui.viewmodel.UiState
@@ -70,7 +69,6 @@ fun CloudOfflineScreen(
   allTracks: List<OfflineTrackEntity>,
   customSourcesState: UiState<List<CustomMusicSource>>,
   syncStatesState: UiState<List<SyncState>>,
-  userEmail: String?,
   onSelectGlobalRegion: (String) -> Unit,
   onAddCustomSource: (String, String, String, String, String, String, String, String) -> Unit,
   onAddKnownTemplate: (KnownApiTemplate, String) -> Unit,
@@ -82,7 +80,9 @@ fun CloudOfflineScreen(
   onResumeFromSyncedDevice: (SyncState) -> Unit,
   onToggleOfflineDownload: (OfflineTrackEntity) -> Unit,
   onPlayTrack: (OfflineTrackEntity) -> Unit,
+  onSessionUpdated: (AuraAccountSession) -> Unit,
   onSignOut: () -> Unit,
+  onShowStatusMessage: (String) -> Unit,
   onBackToDeck: () -> Unit,
 ) {
   BackHandler { onBackToDeck() }
@@ -101,6 +101,16 @@ fun CloudOfflineScreen(
     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     verticalArrangement = Arrangement.spacedBy(16.dp),
   ) {
+    // 0. Optional Account Sync Card (Local-First Mode + Google Login + GitHub Login)
+    item {
+      OptionalAccountSyncCard(
+        session = playerState.accountSession,
+        onSessionUpdated = onSessionUpdated,
+        onSignOut = onSignOut,
+        onStatusMessage = onShowStatusMessage,
+      )
+    }
+
     // 1. Global Country & Area Routing Bar (All Countries Worldwide)
     item {
       Card(
@@ -412,7 +422,7 @@ fun CloudOfflineScreen(
                 style = MaterialTheme.typography.titleLarge,
               )
               Text(
-                text = "Instant Firestore session & custom API sync across devices",
+                text = "Local & cloud session handoff across devices",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
@@ -553,52 +563,7 @@ fun CloudOfflineScreen(
       }
     }
 
-    // 6. Account & Session Footer
     item {
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-      ) {
-        Row(
-          modifier = Modifier.fillMaxWidth().padding(16.dp),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-          ) {
-            Icon(
-              Icons.Filled.CloudDone,
-              contentDescription = null,
-              tint = MaterialTheme.colorScheme.primary,
-            )
-            Column {
-              Text(
-                text = userEmail ?: "Authenticated Google Account",
-                style = MaterialTheme.typography.titleMedium,
-              )
-              Text(
-                text = "Zero-trust Firestore sync active",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-            }
-          }
-          OutlinedButton(
-            onClick = onSignOut,
-            modifier = Modifier.testTag("sign_out_button"),
-          ) {
-            Icon(
-              Icons.AutoMirrored.Filled.Logout,
-              contentDescription = null,
-              modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Sign Out")
-          }
-        }
-      }
       Spacer(modifier = Modifier.height(24.dp))
     }
   }

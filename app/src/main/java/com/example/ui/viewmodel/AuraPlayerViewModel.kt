@@ -15,6 +15,12 @@ import com.example.data.remote.CustomMusicSourceBridge
 import com.example.data.remote.EndpointTestResult
 import com.example.data.remote.KnownApiTemplate
 import com.example.data.repository.AuraFirestoreRepository
+import com.example.ui.auth.AuraAccountSession
+import com.google.firebase.Firebase
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.auth
+import java.util.UUID
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -69,6 +75,7 @@ data class PlayerUiState(
   val customThemeAccentHex: String? = null,
   val visualizerStyle: String = "VINYL_FFT",
   val developerPulseCount: Int = 128,
+  val accountSession: AuraAccountSession = AuraAccountSession(),
 )
 
 class AuraPlayerViewModel(
@@ -86,6 +93,13 @@ class AuraPlayerViewModel(
   private val _playerState = MutableStateFlow(PlayerUiState())
   val playerState: StateFlow<PlayerUiState> = _playerState.asStateFlow()
 
+  private val _localPlaylists = MutableStateFlow(defaultLocalPlaylists(currentUserId))
+  private val _localCustomSources = MutableStateFlow(defaultLocalCustomSources(currentUserId))
+  private val _localSoundProfiles = MutableStateFlow(defaultLocalSoundProfiles(currentUserId))
+  private val _localSyncStates = MutableStateFlow(defaultLocalSyncStates(currentUserId))
+
+  private var cloudSyncJobs: List<Job> = emptyList()
+
   val tracksState: StateFlow<List<OfflineTrackEntity>> =
     offlineVaultRepository.allTracks
       .catch { e ->
@@ -99,67 +113,47 @@ class AuraPlayerViewModel(
       )
 
   val playlistsState: StateFlow<UiState<List<Playlist>>> =
-    firestoreRepository
-      .observePlaylists(currentUserId)
+    _localPlaylists
       .map<List<Playlist>, UiState<List<Playlist>>> { list ->
         UiState.Success(list.sortedByDescending { it.updatedAt ?: it.createdAt })
       }
-      .catch { error ->
-        Log.w(TAG, "Error observing playlists", error)
-        emit(UiState.Error(error.localizedMessage ?: "Failed to load cloud playlists"))
-      }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000L),
-        initialValue = UiState.Loading,
+        initialValue = UiState.Success(_localPlaylists.value),
       )
 
   val customSourcesState: StateFlow<UiState<List<CustomMusicSource>>> =
-    firestoreRepository
-      .observeCustomSources(currentUserId)
+    _localCustomSources
       .map<List<CustomMusicSource>, UiState<List<CustomMusicSource>>> { list ->
         UiState.Success(list.sortedByDescending { it.updatedAt ?: it.createdAt })
       }
-      .catch { error ->
-        Log.w(TAG, "Error observing custom music sources", error)
-        emit(UiState.Error(error.localizedMessage ?: "Failed to load custom music APIs"))
-      }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000L),
-        initialValue = UiState.Loading,
+        initialValue = UiState.Success(_localCustomSources.value),
       )
 
   val soundProfilesState: StateFlow<UiState<List<SoundProfile>>> =
-    firestoreRepository
-      .observeSoundProfiles(currentUserId)
+    _localSoundProfiles
       .map<List<SoundProfile>, UiState<List<SoundProfile>>> { list ->
         UiState.Success(list.sortedByDescending { it.updatedAt ?: it.createdAt })
       }
-      .catch { error ->
-        Log.w(TAG, "Error observing sound profiles", error)
-        emit(UiState.Error(error.localizedMessage ?: "Failed to load sound profiles"))
-      }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000L),
-        initialValue = UiState.Loading,
+        initialValue = UiState.Success(_localSoundProfiles.value),
       )
 
   val syncStatesState: StateFlow<UiState<List<SyncState>>> =
-    firestoreRepository
-      .observeSyncStates(currentUserId)
+    _localSyncStates
       .map<List<SyncState>, UiState<List<SyncState>>> { list ->
         UiState.Success(list.sortedByDescending { it.updatedAt ?: it.createdAt })
-      }
-      .catch { error ->
-        Log.w(TAG, "Error observing sync state", error)
-        emit(UiState.Error(error.localizedMessage ?: "Failed to load cross-device sync state"))
       }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000L),
-        initialValue = UiState.Loading,
+        initialValue = UiState.Success(_localSyncStates.value),
       )
 
   init {
@@ -174,11 +168,89 @@ class AuraPlayerViewModel(
         spatializer = _playerState.value.spatializerStrength,
         bitPerfect = _playerState.value.dacBitPerfectMode,
       )
-      seedDefaultCloudEntitiesIfNeeded()
+      if (Firebase.auth.currentUser != null) {
+        attachCloudObserversIfAuthenticated(Firebase.auth.currentUser!!.uid)
+      }
+    }
+  }
+
+  private fun isCloudSessionReady(): Boolean = Firebase.auth.currentUser != null
+
+  private fun attachCloudObserversIfAuthenticated(uid: String) {
+    cloudSyncJobs.forEach { it.cancel() }
+    val j1 =
+      viewModelScope.launch {
+        seedDefaultCloudEntitiesIfNeeded()
+        firestoreRepository
+          .observePlaylists(uid)
+          .catch { e -> Log.w(TAG, "Cloud playlist listener fallback to local", e) }
+          .collect { remoteList ->
+            if (remoteList.isNotEmpty()) {
+              _localPlaylists.value = remoteList
+            }
+          }
+      }
+    val j2 =
+      viewModelScope.launch {
+        firestoreRepository
+          .observeCustomSources(uid)
+          .catch { e -> Log.w(TAG, "Cloud custom sources listener fallback to local", e) }
+          .collect { remoteList ->
+            if (remoteList.isNotEmpty()) {
+              _localCustomSources.value = remoteList
+            }
+          }
+      }
+    val j3 =
+      viewModelScope.launch {
+        firestoreRepository
+          .observeSoundProfiles(uid)
+          .catch { e -> Log.w(TAG, "Cloud sound profiles listener fallback to local", e) }
+          .collect { remoteList ->
+            if (remoteList.isNotEmpty()) {
+              _localSoundProfiles.value = remoteList
+            }
+          }
+      }
+    val j4 =
+      viewModelScope.launch {
+        firestoreRepository
+          .observeSyncStates(uid)
+          .catch { e -> Log.w(TAG, "Cloud sync states listener fallback to local", e) }
+          .collect { remoteList ->
+            if (remoteList.isNotEmpty()) {
+              _localSyncStates.value = remoteList
+            }
+          }
+      }
+    cloudSyncJobs = listOf(j1, j2, j3, j4)
+  }
+
+  fun updateAccountSession(session: AuraAccountSession) {
+    _playerState.update { it.copy(accountSession = session) }
+    val fbUser = Firebase.auth.currentUser
+    if (fbUser != null && session.isFirebaseCloudAuthenticated) {
+      attachCloudObserversIfAuthenticated(fbUser.uid)
+    } else {
+      cloudSyncJobs.forEach { it.cancel() }
+      cloudSyncJobs = emptyList()
+    }
+  }
+
+  fun handleSignOutToLocalMode() {
+    cloudSyncJobs.forEach { it.cancel() }
+    cloudSyncJobs = emptyList()
+    _playerState.update {
+      it.copy(
+        accountSession = AuraAccountSession(),
+        statusBannerMessage =
+          "Switched to Local Studio Mode (All features remain active offline/locally)",
+      )
     }
   }
 
   private suspend fun seedDefaultCloudEntitiesIfNeeded() {
+    if (!isCloudSessionReady()) return
     val existingPlaylists = firestoreRepository.getUserPlaylists().getOrNull()
     if (existingPlaylists != null && existingPlaylists.isEmpty()) {
       firestoreRepository.createPlaylist(
@@ -485,7 +557,7 @@ class AuraPlayerViewModel(
     }
   }
 
-  // --- CUSTOM PLAYLISTS CRUD ---
+  // --- CUSTOM PLAYLISTS CRUD (HYBRID LOCAL-FIRST + OPTIONAL CLOUD) ---
 
   fun createCustomPlaylist(
     title: String,
@@ -495,8 +567,33 @@ class AuraPlayerViewModel(
     isOfflinePinned: Boolean,
     selectedTrackIds: List<String>,
   ) {
+    val now = Timestamp.now()
+    val newId = "pl_${UUID.randomUUID().toString().take(12)}"
+    val newPlaylist =
+      Playlist(
+        id = newId,
+        userId = _playerState.value.accountSession.uid,
+        title = title.trim().take(120),
+        description = description.trim().take(400),
+        accentHex = accentHex,
+        sourceService = sourceService,
+        isOfflinePinned = isOfflinePinned,
+        trackIds = selectedTrackIds.take(100),
+        createdAt = now,
+        updatedAt = now,
+      )
+    _localPlaylists.update { listOf(newPlaylist) + it }
+
     viewModelScope.launch {
-      val result =
+      if (isOfflinePinned) {
+        val catalog = tracksState.value
+        selectedTrackIds.forEach { id ->
+          catalog.find { it.trackId == id && !it.isDownloadedOffline }?.let { track ->
+            offlineVaultRepository.toggleOfflineDownload(track)
+          }
+        }
+      }
+      if (isCloudSessionReady()) {
         firestoreRepository.createPlaylist(
           title = title,
           description = description,
@@ -504,82 +601,71 @@ class AuraPlayerViewModel(
           sourceService = sourceService,
           isOfflinePinned = isOfflinePinned,
           trackIds = selectedTrackIds,
+          customId = newId,
         )
-      result
-        .onSuccess {
-          if (isOfflinePinned) {
-            val catalog = tracksState.value
-            selectedTrackIds.forEach { id ->
-              catalog.find { it.trackId == id && !it.isDownloadedOffline }?.let { track ->
-                offlineVaultRepository.toggleOfflineDownload(track)
-              }
-            }
-          }
-          _playerState.update {
-            it.copy(statusBannerMessage = "Created & synced playlist '$title'")
-          }
-        }
-        .onFailure { e ->
-          _playerState.update {
-            it.copy(statusBannerMessage = "Playlist sync error: ${e.localizedMessage}")
-          }
-        }
+      }
+      _playerState.update {
+        it.copy(statusBannerMessage = "Created playlist '$title'")
+      }
     }
   }
 
   fun toggleTrackInPlaylist(playlist: Playlist, trackId: String) {
+    val updatedTracks =
+      if (playlist.trackIds.contains(trackId)) {
+        playlist.trackIds - trackId
+      } else {
+        (playlist.trackIds + trackId).take(100)
+      }
+    val updated = playlist.copy(trackIds = updatedTracks, updatedAt = Timestamp.now())
+    _localPlaylists.update { list -> list.map { if (it.id == playlist.id) updated else it } }
+
     viewModelScope.launch {
-      val updatedTracks =
-        if (playlist.trackIds.contains(trackId)) {
-          playlist.trackIds - trackId
-        } else {
-          (playlist.trackIds + trackId).take(100)
-        }
-      firestoreRepository
-        .updatePlaylist(playlist.copy(trackIds = updatedTracks))
-        .onFailure { e ->
-          _playerState.update {
-            it.copy(statusBannerMessage = "Failed to update playlist: ${e.localizedMessage}")
-          }
-        }
+      if (isCloudSessionReady()) {
+        firestoreRepository.updatePlaylist(updated)
+      }
     }
   }
 
   fun togglePlaylistOfflinePin(playlist: Playlist) {
+    val newPinned = !playlist.isOfflinePinned
+    val updated = playlist.copy(isOfflinePinned = newPinned, updatedAt = Timestamp.now())
+    _localPlaylists.update { list -> list.map { if (it.id == playlist.id) updated else it } }
+
     viewModelScope.launch {
-      val newPinned = !playlist.isOfflinePinned
-      firestoreRepository
-        .updatePlaylist(playlist.copy(isOfflinePinned = newPinned))
-        .onSuccess {
-          if (newPinned) {
-            val catalog = tracksState.value
-            playlist.trackIds.forEach { id ->
-              catalog.find { it.trackId == id && !it.isDownloadedOffline }?.let { trk ->
-                offlineVaultRepository.toggleOfflineDownload(trk)
-              }
-            }
-          }
-          _playerState.update {
-            it.copy(
-              statusBannerMessage =
-                if (newPinned) "Playlist '${playlist.title}' pinned for Offline Lossless playback"
-                else "Offline pin disabled for '${playlist.title}'"
-            )
+      if (newPinned) {
+        val catalog = tracksState.value
+        playlist.trackIds.forEach { id ->
+          catalog.find { it.trackId == id && !it.isDownloadedOffline }?.let { trk ->
+            offlineVaultRepository.toggleOfflineDownload(trk)
           }
         }
+      }
+      if (isCloudSessionReady()) {
+        firestoreRepository.updatePlaylist(updated)
+      }
+      _playerState.update {
+        it.copy(
+          statusBannerMessage =
+            if (newPinned) "Playlist '${playlist.title}' pinned for Offline Lossless playback"
+            else "Offline pin disabled for '${playlist.title}'"
+        )
+      }
     }
   }
 
   fun deletePlaylist(playlistId: String) {
+    _localPlaylists.update { list -> list.filterNot { it.id == playlistId } }
+    _playerState.update { state ->
+      state.copy(
+        selectedPlaylistId =
+          if (state.selectedPlaylistId == playlistId) null else state.selectedPlaylistId,
+        statusBannerMessage = "Playlist deleted",
+      )
+    }
     viewModelScope.launch {
-      firestoreRepository.deletePlaylist(playlistId).onSuccess {
-        _playerState.update { state ->
-          state.copy(
-            selectedPlaylistId =
-              if (state.selectedPlaylistId == playlistId) null else state.selectedPlaylistId,
-            statusBannerMessage = "Playlist deleted from cloud",
-          )
-        }
+      if (isCloudSessionReady()) {
+        firestoreRepository.deletePlaylist(playlistId)
       }
     }
   }
@@ -635,9 +721,31 @@ class AuraPlayerViewModel(
 
   fun saveCurrentSoundProfile(profileName: String) {
     val state = _playerState.value
+    val now = Timestamp.now()
+    val newId = "eq_${UUID.randomUUID().toString().take(12)}"
+    val newProfile =
+      SoundProfile(
+        id = newId,
+        userId = state.accountSession.uid,
+        name = profileName.trim().take(80),
+        presetCategory = state.activePresetCategory,
+        bandsDb = state.bandsTenthsDb.take(10),
+        preampGainTenths = state.preampTenthsDb,
+        bassBoostPercent = state.bassBoostPercent,
+        spatializerStrength = state.spatializerStrength,
+        dacBitPerfectMode = state.dacBitPerfectMode,
+        isActive = true,
+        createdAt = now,
+        updatedAt = now,
+      )
+    _localSoundProfiles.update { listOf(newProfile) + it }
+    _playerState.update {
+      it.copy(statusBannerMessage = "Saved EQ profile '$profileName'")
+    }
+
     viewModelScope.launch {
-      firestoreRepository
-        .createSoundProfile(
+      if (isCloudSessionReady()) {
+        firestoreRepository.createSoundProfile(
           name = profileName,
           presetCategory = state.activePresetCategory,
           bandsDb = state.bandsTenthsDb,
@@ -646,17 +754,9 @@ class AuraPlayerViewModel(
           spatializerStrength = state.spatializerStrength,
           dacBitPerfectMode = state.dacBitPerfectMode,
           isActive = true,
+          customId = newId,
         )
-        .onSuccess {
-          _playerState.update {
-            it.copy(statusBannerMessage = "Saved & synced EQ profile '$profileName'")
-          }
-        }
-        .onFailure { e ->
-          _playerState.update {
-            it.copy(statusBannerMessage = "Failed to save EQ profile: ${e.localizedMessage}")
-          }
-        }
+      }
     }
   }
 
@@ -676,8 +776,11 @@ class AuraPlayerViewModel(
   }
 
   fun deleteSoundProfile(profileId: String) {
+    _localSoundProfiles.update { list -> list.filterNot { it.id == profileId } }
     viewModelScope.launch {
-      firestoreRepository.deleteSoundProfile(profileId)
+      if (isCloudSessionReady()) {
+        firestoreRepository.deleteSoundProfile(profileId)
+      }
     }
   }
 
@@ -704,9 +807,34 @@ class AuraPlayerViewModel(
     customHeaderValue: String,
     preferredCodec: String,
   ) {
+    val now = Timestamp.now()
+    val newId = "src_${UUID.randomUUID().toString().take(12)}"
+    val newSource =
+      CustomMusicSource(
+        id = newId,
+        userId = _playerState.value.accountSession.uid,
+        name = name.trim().take(120),
+        baseUrl = baseUrl.trim().take(500),
+        searchPath = searchPath.trim().take(300),
+        protocolType = protocolType,
+        regionCode = regionCode.trim().uppercase().take(16).ifEmpty { "GLOBAL" },
+        customHeaderName = customHeaderName.trim().take(80),
+        customHeaderValue = customHeaderValue.trim().take(200),
+        preferredCodec = preferredCodec.trim().take(40).ifEmpty { "FLAC 24-Bit" },
+        isEnabled = true,
+        createdAt = now,
+        updatedAt = now,
+      )
+    _localCustomSources.update { listOf(newSource) + it }
+    _playerState.update {
+      it.copy(
+        statusBannerMessage = "Added custom music source '$name' [${regionCode.uppercase()}]"
+      )
+    }
+
     viewModelScope.launch {
-      firestoreRepository
-        .createCustomSource(
+      if (isCloudSessionReady()) {
+        firestoreRepository.createCustomSource(
           name = name,
           baseUrl = baseUrl,
           searchPath = searchPath,
@@ -716,20 +844,9 @@ class AuraPlayerViewModel(
           customHeaderValue = customHeaderValue,
           preferredCodec = preferredCodec,
           isEnabled = true,
+          customId = newId,
         )
-        .onSuccess {
-          _playerState.update {
-            it.copy(
-              statusBannerMessage =
-                "Added custom music source '$name' [${regionCode.uppercase()}]"
-            )
-          }
-        }
-        .onFailure { e ->
-          _playerState.update {
-            it.copy(statusBannerMessage = "Failed to save custom API: ${e.localizedMessage}")
-          }
-        }
+      }
     }
   }
 
@@ -747,17 +864,23 @@ class AuraPlayerViewModel(
   }
 
   fun toggleCustomSourceEnabled(source: CustomMusicSource) {
+    val updated = source.copy(isEnabled = !source.isEnabled, updatedAt = Timestamp.now())
+    _localCustomSources.update { list -> list.map { if (it.id == source.id) updated else it } }
     viewModelScope.launch {
-      firestoreRepository.updateCustomSource(source.copy(isEnabled = !source.isEnabled))
+      if (isCloudSessionReady()) {
+        firestoreRepository.updateCustomSource(updated)
+      }
     }
   }
 
   fun deleteCustomSource(sourceId: String) {
+    _localCustomSources.update { list -> list.filterNot { it.id == sourceId } }
+    _playerState.update {
+      it.copy(statusBannerMessage = "Removed custom music source API")
+    }
     viewModelScope.launch {
-      firestoreRepository.deleteCustomSource(sourceId).onSuccess {
-        _playerState.update {
-          it.copy(statusBannerMessage = "Removed custom music source API")
-        }
+      if (isCloudSessionReady()) {
+        firestoreRepository.deleteCustomSource(sourceId)
       }
     }
   }
@@ -831,15 +954,16 @@ class AuraPlayerViewModel(
     val state = _playerState.value
     val track = state.currentTrack ?: return
     val deviceId = "android_${Build.MODEL.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").take(32)}"
-    val existingDoc =
-      (syncStatesState.value as? UiState.Success)?.data?.find { it.id == deviceId }
-    val activeSources = (customSourcesState.value as? UiState.Success)?.data.orEmpty()
+    val existingDoc = _localSyncStates.value.find { it.id == deviceId }
+    val activeSources = _localCustomSources.value
     val primarySourceName =
       activeSources.firstOrNull { it.isEnabled }?.name ?: "Aura Hi-Res Core"
 
-    viewModelScope.launch {
-      firestoreRepository.publishSyncState(
-        deviceId = deviceId,
+    val now = Timestamp.now()
+    val updatedSync =
+      SyncState(
+        id = deviceId,
+        userId = state.accountSession.uid,
         deviceName =
           "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL} (Hi-Res Deck)",
         activeTrackId = track.trackId,
@@ -855,8 +979,29 @@ class AuraPlayerViewModel(
         audioQualityBadge = "${track.bitDepth}-bit/${track.sampleRateKhz}kHz ${track.codec}",
         activeSourceName = primarySourceName,
         regionCode = state.selectedGlobalRegion,
-        existingCreatedAt = existingDoc?.createdAt,
+        createdAt = existingDoc?.createdAt ?: now,
+        updatedAt = now,
       )
+
+    _localSyncStates.update { current ->
+      listOf(updatedSync) + current.filterNot { it.id == deviceId }
+    }
+
+    viewModelScope.launch {
+      if (isCloudSessionReady()) {
+        firestoreRepository.publishSyncState(
+          deviceId = deviceId,
+          deviceName = updatedSync.deviceName,
+          activeTrackId = updatedSync.activeTrackId,
+          positionMs = updatedSync.positionMs,
+          isPlaying = updatedSync.isPlaying,
+          activeService = updatedSync.activeService,
+          audioQualityBadge = updatedSync.audioQualityBadge,
+          activeSourceName = updatedSync.activeSourceName,
+          regionCode = updatedSync.regionCode,
+          existingCreatedAt = existingDoc?.createdAt,
+        )
+      }
     }
   }
 
@@ -882,7 +1027,130 @@ class AuraPlayerViewModel(
     audioEngine.stopPlayback()
   }
 
-  private companion object {
-    const val TAG = "AuraPlayerVM"
+  companion object {
+    private const val TAG = "AuraPlayerVM"
+
+    private fun defaultLocalPlaylists(userId: String): List<Playlist> {
+      val now = Timestamp.now()
+      return listOf(
+        Playlist(
+          id = "pl_default_reference",
+          userId = userId,
+          title = "Late Night 24-Bit Reference",
+          description = "Audiophile studio masters & spatial soundstage showcase",
+          accentHex = "#00F5D4",
+          sourceService = "AURA_HIFI",
+          isOfflinePinned = true,
+          trackIds = listOf("trk_neon_01", "trk_velvet_03", "trk_amber_05"),
+          createdAt = now,
+          updatedAt = now,
+        ),
+        Playlist(
+          id = "pl_default_global_custom",
+          userId = userId,
+          title = "World Custom API Lossless Mix",
+          description = "Global multi-region custom API streams (JP, KR, DE, BR, IN)",
+          accentHex = "#FF9F1C",
+          sourceService = "CUSTOM_API",
+          isOfflinePinned = false,
+          trackIds = listOf("trk_solar_02", "trk_cyber_04", "trk_emerald_06"),
+          createdAt = now,
+          updatedAt = now,
+        ),
+      )
+    }
+
+    private fun defaultLocalCustomSources(userId: String): List<CustomMusicSource> {
+      val now = Timestamp.now()
+      return listOf(
+        CustomMusicSource(
+          id = "src_default_radiobrowser",
+          userId = userId,
+          name = "Global Radio-Browser Lossless API",
+          baseUrl = "https://de1.api.radio-browser.info",
+          searchPath = "/json/stations/search",
+          protocolType = "RADIO_BROWSER_GLOBAL",
+          regionCode = "GLOBAL",
+          customHeaderName = "",
+          customHeaderValue = "",
+          preferredCodec = "FLAC / Lossless Stream",
+          isEnabled = true,
+          createdAt = now,
+          updatedAt = now,
+        ),
+        CustomMusicSource(
+          id = "src_default_global_json",
+          userId = userId,
+          name = "Multi-Country Music Catalog JSON API",
+          baseUrl = "https://itunes.apple.com",
+          searchPath = "search?media=music&entity=song&limit=15&country={region}&term={query}",
+          protocolType = "OPEN_REST_JSON",
+          regionCode = "GLOBAL",
+          customHeaderName = "",
+          customHeaderValue = "",
+          preferredCodec = "24-Bit / 96kHz Master",
+          isEnabled = true,
+          createdAt = now,
+          updatedAt = now,
+        ),
+        CustomMusicSource(
+          id = "src_default_archive",
+          userId = userId,
+          name = "Internet Archive Lossless Concert Vault",
+          baseUrl = "https://archive.org",
+          searchPath = "/advancedsearch.php",
+          protocolType = "ARCHIVE_LOSSLESS",
+          regionCode = "GLOBAL",
+          customHeaderName = "",
+          customHeaderValue = "",
+          preferredCodec = "FLAC 24-Bit Archive",
+          isEnabled = true,
+          createdAt = now,
+          updatedAt = now,
+        ),
+      )
+    }
+
+    private fun defaultLocalSoundProfiles(userId: String): List<SoundProfile> {
+      val now = Timestamp.now()
+      return listOf(
+        SoundProfile(
+          id = "eq_default_harman",
+          userId = userId,
+          name = "Harman 2026 Reference Curve",
+          presetCategory = "HARMAN_TARGET",
+          bandsDb = listOf(25L, 20L, 10L, 0L, -5L, 5L, 15L, 25L, 20L, 10L),
+          preampGainTenths = -15L,
+          bassBoostPercent = 25L,
+          spatializerStrength = 35L,
+          dacBitPerfectMode = false,
+          isActive = true,
+          createdAt = now,
+          updatedAt = now,
+        )
+      )
+    }
+
+    private fun defaultLocalSyncStates(userId: String): List<SyncState> {
+      val now = Timestamp.now()
+      val deviceId = "android_${Build.MODEL.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").take(32)}"
+      return listOf(
+        SyncState(
+          id = deviceId,
+          userId = userId,
+          deviceName =
+            "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL} (Local Studio)",
+          activeTrackId = "trk_neon_01",
+          positionMs = 0L,
+          isPlaying = false,
+          activeService = "AURA_HIFI",
+          audioQualityBadge = "24-bit/192kHz FLAC",
+          activeSourceName = "Global Radio-Browser Lossless API",
+          regionCode = "GLOBAL",
+          createdAt = now,
+          updatedAt = now,
+        )
+      )
+    }
   }
 }
