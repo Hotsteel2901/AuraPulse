@@ -66,5 +66,11 @@ class ListeningStore(context: Context) {
   private fun readResume(): ResumePoint? = prefs.getString("last_track", null)?.takeIf(String::isNotBlank)
     ?.let { ResumePoint(it, prefs.getLong("last_position_ms", 0).coerceAtLeast(0)) }
 
-  companion object { const val MAX_HISTORY = 100 }
+  companion object {
+    const val MAX_HISTORY = 100
+    @Volatile private var instance: ListeningStore? = null
+    fun get(context: Context): ListeningStore = instance ?: synchronized(this) {
+      instance ?: ListeningStore(context.applicationContext).also { instance = it }
+    }
+  }
 }

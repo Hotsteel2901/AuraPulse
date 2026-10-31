@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.Application
 import android.content.ComponentName
 import android.net.Uri
-import android.os.SystemClock
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -84,7 +83,7 @@ data class DownloadProgress(val bytes: Long, val total: Long?)
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
   private val database = LibraryDatabase.get(application)
   private val library = LibraryRepository(application, database)
-  private val listening = ListeningStore(application)
+  private val listening = ListeningStore.get(application)
   private val downloads = AudioDownloadManager(application, database)
   private val discovery = MusicDiscovery()
   private val prefs = application.getSharedPreferences("discovery", Application.MODE_PRIVATE)
@@ -96,8 +95,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   private var searchJob: Job? = null
   private val sessionTracks = mutableMapOf<String, LibraryTrack>()
   private var indexedTracks: Map<String, LibraryTrack> = emptyMap()
-  private var lastHistoryId: String? = null
-  private var lastPositionWrite = 0L
   private var controller: MediaController? = null
 
   val tracks = library.tracks.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -142,7 +139,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     override fun onEvents(player: Player, events: Player.Events) {
       if (events.contains(Player.EVENT_TIMELINE_CHANGED)) refreshQueue(player)
       refreshPlayback(player)
-      if (!player.isPlaying) savePosition(player)
     }
     override fun onPlayerError(error: PlaybackException) {
       notify(R.string.playback_error, safeError(error))
@@ -170,11 +166,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch {
       while (isActive) {
         val current = controller
-        if (current?.isPlaying == true) {
-          refreshPlayback(current)
-          if (SystemClock.elapsedRealtime() - lastPositionWrite >= 5_000L) savePosition(current)
-        }
-        delay(if (current?.isPlaying == true) 500L else 2_000L)
+        val observed = mutablePlayback.subscriptionCount.value > 0
+        if (current?.isPlaying == true && observed) refreshPlayback(current)
+        delay(if (current?.isPlaying == true && observed) 500L else 2_000L)
       }
     }
   }
@@ -203,16 +197,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
       shuffle = player.shuffleModeEnabled, repeatMode = player.repeatMode,
       queueIndex = player.currentMediaItemIndex.takeIf { player.currentMediaItem != null } ?: -1,
     )
-    if (player.isPlaying && found != null && found.id != lastHistoryId) {
-      lastHistoryId = found.id
-      listening.recordTrack(found.id)
-    }
-  }
-
-  private fun savePosition(player: Player) {
-    val id = player.currentMediaItem?.mediaId ?: return
-    lastPositionWrite = SystemClock.elapsedRealtime()
-    listening.recordPosition(id, if (player.isCurrentMediaItemSeekable && player.playbackState != Player.STATE_ENDED) player.currentPosition else 0L)
   }
 
   private fun toMediaItem(item: LibraryTrack): MediaItem {
@@ -503,7 +487,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   override fun onCleared() {
     downloadJobs.keys.toList().forEach { downloads.cancel(it) }
     auth?.removeAuthStateListener(authListener)
-    controller?.let(::savePosition)
     controller?.removeListener(playerListener)
     MediaController.releaseFuture(controllerFuture)
     mutableNotices.close()

@@ -149,12 +149,12 @@ jobs:
             chmod +x ./gradlew
           fi
 
-      - name: Assemble Debug APK
+      - name: Assemble Debug APK and Device Test APK
         run: |
           if [ -f ./gradlew ]; then
-            ./gradlew :app:assembleDebug --stacktrace
+            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
           else
-            gradle :app:assembleDebug --stacktrace
+            gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
           fi
 
       - name: Start Firebase Emulators & Run Unit + Robolectric Tests

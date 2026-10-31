@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class PlaybackService : MediaSessionService() {
   private var session: MediaSession? = null
   private var player: ExoPlayer? = null
+  private var listeningTracker: ServiceListeningTracker? = null
 
   override fun onCreate() {
     super.onCreate()
@@ -30,6 +31,7 @@ class PlaybackService : MediaSessionService() {
       .setHandleAudioBecomingNoisy(true)
       .build().also { exo ->
         PlaybackEnhancements.attach(applicationContext, exo)
+        listeningTracker = ServiceListeningTracker(applicationContext, exo)
         exo.addListener(object : Player.Listener {
           override fun onAudioSessionIdChanged(audioSessionId: Int) {
             DeviceEqualizer.attach(audioSessionId)
@@ -48,6 +50,8 @@ class PlaybackService : MediaSessionService() {
   }
 
   override fun onDestroy() {
+    listeningTracker?.close()
+    listeningTracker = null
     PlaybackEnhancements.detach()
     DeviceEqualizer.release()
     session?.release()

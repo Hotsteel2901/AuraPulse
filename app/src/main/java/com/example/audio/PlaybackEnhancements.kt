@@ -67,14 +67,13 @@ object PlaybackEnhancements {
         player?.pause()
         mutableState.update { it.copy(sleepAtTrackEnd = false) }
       }
-      if (loopMediaId != null && (loopMediaId != mediaItem?.mediaId || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)) {
-        clearLoop()
-      }
+      if (loopMediaId != null) clearLoop()
       schedule()
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
       if (playbackState == Player.STATE_ENDED && mutableState.value.sleepAtTrackEnd) {
+        player?.pause()
         mutableState.update { it.copy(sleepAtTrackEnd = false) }
       }
       schedule()
