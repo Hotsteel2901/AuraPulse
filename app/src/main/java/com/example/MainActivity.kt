@@ -10,6 +10,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -24,7 +30,9 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -48,6 +56,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.player.AboutScreen
 import com.example.ui.player.DiscoveryScreen
 import com.example.ui.player.LibraryScreen
 import com.example.ui.player.MiniPlayer
@@ -91,21 +100,28 @@ private enum class Destination(val label: Int, val icon: ImageVector) {
   DISCOVER(R.string.nav_discover, Icons.Default.Explore),
   PLAYLISTS(R.string.nav_playlists, Icons.AutoMirrored.Filled.QueueMusic),
   SETTINGS(R.string.nav_settings, Icons.Default.Settings),
+  ABOUT(R.string.about_title, Icons.Default.Info),
 }
 
+private val navigationDestinations = Destination.entries.filter { it != Destination.ABOUT }
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
-  val playback by vm.playback.collectAsStateWithLifecycle()
   val importing by vm.importing.collectAsStateWithLifecycle()
   var destination by rememberSaveable { mutableStateOf(Destination.LIBRARY) }
   var playerOpen by rememberSaveable { mutableStateOf(false) }
+  var focusEqualizer by rememberSaveable { mutableStateOf(false) }
+  val motion = MaterialTheme.motionScheme
   val snackbar = remember { SnackbarHostState() }
   val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> vm.importFiles(uris) }
   val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> uri?.let(vm::importFolder) }
   LaunchedEffect(vm, activity) {
     vm.notices.collect { notice -> snackbar.showSnackbar(activity.getString(notice.resource, *notice.args.toTypedArray())) }
   }
-  BackHandler(enabled = destination != Destination.LIBRARY && !playerOpen) { destination = Destination.LIBRARY }
+  BackHandler(enabled = destination != Destination.LIBRARY && !playerOpen) {
+    destination = if (destination == Destination.ABOUT) Destination.SETTINGS else Destination.LIBRARY
+  }
 
   Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
     BoxWithConstraints {
@@ -113,9 +129,9 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
       Row(Modifier.fillMaxSize()) {
         if (wide) {
           NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
-            Destination.entries.forEach { tab ->
+            navigationDestinations.forEach { tab ->
               NavigationRailItem(
-                selected = destination == tab, onClick = { destination = tab },
+                selected = destination == tab || (destination == Destination.ABOUT && tab == Destination.SETTINGS), onClick = { destination = tab },
                 icon = { Icon(tab.icon, contentDescription = null) }, label = { Text(stringResource(tab.label)) },
               )
             }
@@ -127,14 +143,12 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
           snackbarHost = { SnackbarHost(snackbar) },
           bottomBar = {
             Column {
-              playback.track?.let {
-                MiniPlayer(state = playback, onOpen = { playerOpen = true }, onToggle = vm::togglePlay, onNext = vm::next)
-              }
+              MiniPlayerHost(vm, onOpen = { playerOpen = true })
               if (!wide) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                  Destination.entries.forEach { tab ->
+                  navigationDestinations.forEach { tab ->
                     NavigationBarItem(
-                      selected = destination == tab, onClick = { destination = tab },
+                      selected = destination == tab || (destination == Destination.ABOUT && tab == Destination.SETTINGS), onClick = { destination = tab },
                       icon = { Icon(tab.icon, contentDescription = null) },
                       label = { Text(stringResource(tab.label), maxLines = 1) },
                     )
@@ -144,8 +158,14 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
             }
           },
         ) { padding ->
-          Box(Modifier.fillMaxSize().padding(padding)) {
-            when (destination) {
+          AnimatedContent(
+            targetState = destination, modifier = Modifier.fillMaxSize().padding(padding),
+            transitionSpec = {
+              (fadeIn(motion.defaultEffectsSpec()) + slideInVertically(motion.fastSpatialSpec()) { it / 24 }) togetherWith
+                fadeOut(motion.fastEffectsSpec())
+            }, label = "page transition",
+          ) { page ->
+            when (page) {
               Destination.LIBRARY -> LibraryScreen(
                 vm = vm, importing = importing,
                 onPickFiles = { filePicker.launch(arrayOf("audio/*", "application/ogg")) },
@@ -154,14 +174,37 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
               )
               Destination.DISCOVER -> DiscoveryScreen(vm)
               Destination.PLAYLISTS -> PlaylistsScreen(vm)
-              Destination.SETTINGS -> SettingsScreen(vm, activity)
+              Destination.SETTINGS -> SettingsScreen(vm, activity, onAbout = { destination = Destination.ABOUT },
+                focusEqualizer = focusEqualizer, onFocusHandled = { focusEqualizer = false })
+              Destination.ABOUT -> AboutScreen(onBack = { destination = Destination.SETTINGS })
             }
           }
         }
       }
-      if (playerOpen && playback.track != null) {
-        NowPlayingSheet(state = playback, vm = vm, onDismiss = { playerOpen = false })
+      if (playerOpen) {
+        PlayerSheetHost(vm, onDismiss = { playerOpen = false }, onEqualizer = {
+          playerOpen = false; destination = Destination.SETTINGS; focusEqualizer = true
+        })
       }
     }
   }
+}
+
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun MiniPlayerHost(vm: MusicViewModel, onOpen: () -> Unit) {
+  val playback by vm.playback.collectAsStateWithLifecycle()
+  val motion = MaterialTheme.motionScheme
+  AnimatedVisibility(visible = playback.track != null,
+    enter = fadeIn(motion.fastEffectsSpec()), exit = fadeOut(motion.fastEffectsSpec())) {
+    MiniPlayer(state = playback, onOpen = onOpen, onToggle = vm::togglePlay, onNext = vm::next)
+  }
+}
+
+@Composable
+private fun PlayerSheetHost(vm: MusicViewModel, onDismiss: () -> Unit, onEqualizer: () -> Unit) {
+  val playback by vm.playback.collectAsStateWithLifecycle()
+  LaunchedEffect(playback.track == null) { if (playback.track == null) onDismiss() }
+  if (playback.track != null) NowPlayingSheet(state = playback, vm = vm, onDismiss = onDismiss, onEqualizer = onEqualizer)
 }

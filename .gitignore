@@ -21,3 +21,5 @@ debug.keystore
 
 # Local Firebase project configuration and generated debug material
 app/google-services.json
+/debug.keystore.base64
+/*.jks

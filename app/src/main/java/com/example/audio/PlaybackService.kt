@@ -29,6 +29,7 @@ class PlaybackService : MediaSessionService() {
       .setWakeMode(C.WAKE_MODE_NETWORK)
       .setHandleAudioBecomingNoisy(true)
       .build().also { exo ->
+        PlaybackEnhancements.attach(applicationContext, exo)
         exo.addListener(object : Player.Listener {
           override fun onAudioSessionIdChanged(audioSessionId: Int) {
             DeviceEqualizer.attach(audioSessionId)
@@ -47,6 +48,7 @@ class PlaybackService : MediaSessionService() {
   }
 
   override fun onDestroy() {
+    PlaybackEnhancements.detach()
     DeviceEqualizer.release()
     session?.release()
     session = null
@@ -64,12 +66,23 @@ data class EqualizerState(
   val minimumMb: Int = 0,
   val maximumMb: Int = 0,
   val bands: List<EqualizerBand> = emptyList(),
+  val preset: EqualizerPreset? = null,
 )
 
 /** Only reports actual Android audio effect capabilities; no simulated DSP or bit-perfect claims. */
 object DeviceEqualizer {
   private var effect: Equalizer? = null
   private var preferences: android.content.SharedPreferences? = null
+  private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+  private val pendingLevels = mutableMapOf<Int, Int>()
+  private var selectedPreset: EqualizerPreset? = null
+  private val persistBands = Runnable {
+    val edit = preferences?.edit()
+    pendingLevels.forEach { (frequency, level) -> edit?.putInt("band_$frequency", level) }
+    if (selectedPreset == null) edit?.remove("preset") else edit?.putString("preset", selectedPreset!!.name)
+    edit?.apply()
+    pendingLevels.clear()
+  }
   private val mutableState = MutableStateFlow(EqualizerState())
   val state: StateFlow<EqualizerState> = mutableState.asStateFlow()
 
@@ -91,6 +104,7 @@ object DeviceEqualizer {
         eq.setBandLevel(i.toShort(), stored.coerceIn(range[0].toInt(), range[1].toInt()).toShort())
       }
       eq.enabled = preferences?.getBoolean("enabled", false) ?: false
+      selectedPreset = preferences?.getString("preset", null)?.let { name -> EqualizerPreset.entries.find { it.name == name } }
       refresh()
     } catch (_: Exception) {
       runCatching { effect?.release() }
@@ -116,14 +130,38 @@ object DeviceEqualizer {
       val level = levelMb.coerceIn(range[0].toInt(), range[1].toInt())
       eq.setBandLevel(index.toShort(), level.toShort())
       val frequency = eq.getCenterFreq(index.toShort()) / 1000
-      preferences?.edit()?.putInt("band_$frequency", level)?.apply()
+      selectedPreset = null
+      pendingLevels[frequency] = level
+      handler.removeCallbacks(persistBands)
+      handler.postDelayed(persistBands, 500L)
       refresh()
     } catch (_: Exception) { refresh() }
   }
 
-  fun reset() {
-    state.value.bands.forEach { setBand(it.index, 0) }
+  fun applyPreset(preset: EqualizerPreset) {
+    val eq = effect ?: return
+    try {
+      handler.removeCallbacks(persistBands)
+      if (pendingLevels.isNotEmpty()) persistBands.run()
+      val range = eq.bandLevelRange
+      val edit = preferences?.edit()
+      for (i in 0 until eq.numberOfBands.toInt()) {
+        val frequency = eq.getCenterFreq(i.toShort()) / 1000
+        val level = preset.levelAt(frequency, range[0].toInt(), range[1].toInt())
+        eq.setBandLevel(i.toShort(), level.toShort())
+        edit?.putInt("band_$frequency", level)
+      }
+      selectedPreset = preset
+      edit?.putString("preset", preset.name)?.apply()
+      refresh()
+    } catch (_: Exception) {
+      selectedPreset = null
+      preferences?.edit()?.remove("preset")?.apply()
+      refresh()
+    }
   }
+
+  fun reset() = applyPreset(EqualizerPreset.FLAT)
 
   private fun refresh() {
     val eq = effect ?: return
@@ -135,6 +173,7 @@ object DeviceEqualizer {
         bands = (0 until eq.numberOfBands.toInt()).map { i ->
           EqualizerBand(i, eq.getCenterFreq(i.toShort()) / 1000, eq.getBandLevel(i.toShort()).toInt())
         },
+        preset = selectedPreset,
       )
     } catch (_: Exception) {
       mutableState.value = EqualizerState(checked = true)
@@ -142,6 +181,9 @@ object DeviceEqualizer {
   }
 
   fun release() {
+    handler.removeCallbacks(persistBands)
+    if (pendingLevels.isNotEmpty()) persistBands.run()
+    selectedPreset = null
     runCatching { effect?.release() }
     effect = null
     mutableState.value = EqualizerState()

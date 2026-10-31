@@ -22,6 +22,9 @@ import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -51,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.library.LibraryPlaylist
@@ -140,12 +144,28 @@ fun LibraryTrackActions(
   progress: DownloadProgress?,
   vm: MusicViewModel,
 ) {
+  val favorites by vm.favorites.collectAsStateWithLifecycle()
   var menu by remember(track.id) { mutableStateOf(false) }
   var choosingPlaylist by remember(track.id) { mutableStateOf(false) }
   var confirmingRemoval by remember(track.id) { mutableStateOf(false) }
   Box {
     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_actions)) }
     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+      DropdownMenuItem(
+        text = { Text(stringResource(if (track.id in favorites) R.string.remove_favorite else R.string.add_favorite)) },
+        leadingIcon = { Icon(if (track.id in favorites) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null) },
+        onClick = { menu = false; vm.toggleFavorite(track) },
+      )
+      DropdownMenuItem(
+        text = { Text(stringResource(R.string.play_next_in_queue)) },
+        leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) },
+        onClick = { menu = false; vm.enqueue(track, true) },
+      )
+      DropdownMenuItem(
+        text = { Text(stringResource(R.string.add_to_queue)) },
+        leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) },
+        onClick = { menu = false; vm.enqueue(track, false) },
+      )
       DropdownMenuItem(
         text = { Text(stringResource(R.string.add_to_playlist)) },
         leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) },

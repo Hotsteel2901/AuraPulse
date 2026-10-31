@@ -11,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.audio.PlaybackService
+import com.example.audio.PlaybackEnhancements
 import com.google.common.util.concurrent.ListenableFuture
 import java.io.File
 import java.nio.ByteBuffer
@@ -18,6 +19,7 @@ import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -59,6 +61,66 @@ class PlaybackServiceTest {
       assertTrue("Seek was not reported by the media session", seeked.await(10, TimeUnit.SECONDS))
     } finally {
       instrumentation.runOnMainSync { controller.pause(); MediaController.releaseFuture(future) }
+      audio.delete()
+    }
+  }
+
+  @Test fun soundControlsAndEndOfTrackSleepAffectTheRealService() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val audio = File(context.cacheDir, "enhancements-test.wav").also(::writeWav)
+    val instrumentation = InstrumentationRegistry.getInstrumentation()
+    lateinit var future: ListenableFuture<MediaController>
+    instrumentation.runOnMainSync {
+      future = MediaController.Builder(context, SessionToken(context, ComponentName(context, PlaybackService::class.java))).buildAsync()
+    }
+    val controller = future.get(15, TimeUnit.SECONDS)
+    val playing = CountDownLatch(1)
+    val transitioned = CountDownLatch(1)
+    try {
+      instrumentation.runOnMainSync {
+        controller.addListener(object : Player.Listener {
+          override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) playing.countDown() }
+          override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (mediaItem?.mediaId == "second" && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) transitioned.countDown()
+          }
+        })
+        val uri = Uri.fromFile(audio)
+        controller.setMediaItems(listOf(
+          MediaItem.Builder().setMediaId("first").setUri(uri).build(),
+          MediaItem.Builder().setMediaId("second").setUri(uri).build(),
+        ))
+        controller.repeatMode = Player.REPEAT_MODE_OFF
+        controller.prepare()
+        PlaybackEnhancements.setSpeed(1.5f)
+        PlaybackEnhancements.setPitch(0.75f)
+        PlaybackEnhancements.setVolume(0.4f)
+        PlaybackEnhancements.setSkipSilence(true)
+        controller.play()
+      }
+      assertTrue("Playback did not start", playing.await(15, TimeUnit.SECONDS))
+      instrumentation.runOnMainSync {
+        assertEquals(1.5f, PlaybackEnhancements.state.value.speed, 0.01f)
+        assertEquals(0.75f, PlaybackEnhancements.state.value.pitch, 0.01f)
+        assertEquals(0.4f, PlaybackEnhancements.state.value.volume, 0.01f)
+        assertTrue(PlaybackEnhancements.state.value.skipSilence)
+        PlaybackEnhancements.sleepAfterCurrentTrack()
+      }
+      assertTrue("The first real file did not reach its end", transitioned.await(15, TimeUnit.SECONDS))
+      Thread.sleep(400)
+      instrumentation.runOnMainSync {
+        assertTrue("The end-of-track timer did not pause playback", !controller.isPlaying && !controller.playWhenReady)
+        assertTrue("The timer was not cleared", !PlaybackEnhancements.state.value.sleepAtTrackEnd)
+      }
+    } finally {
+      instrumentation.runOnMainSync {
+        PlaybackEnhancements.cancelSleep()
+        PlaybackEnhancements.setSpeed(1f)
+        PlaybackEnhancements.setPitch(1f)
+        PlaybackEnhancements.setVolume(1f)
+        PlaybackEnhancements.setSkipSilence(false)
+        controller.pause()
+        MediaController.releaseFuture(future)
+      }
       audio.delete()
     }
   }

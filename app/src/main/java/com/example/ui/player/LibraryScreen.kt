@@ -22,9 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -55,14 +60,35 @@ fun LibraryScreen(vm: MusicViewModel, importing: Boolean, onPickFiles: () -> Uni
   val tracks by vm.tracks.collectAsStateWithLifecycle()
   val playlists by vm.playlists.collectAsStateWithLifecycle()
   val downloads by vm.downloadState.collectAsStateWithLifecycle()
+  val favorites by vm.favorites.collectAsStateWithLifecycle()
+  val history by vm.history.collectAsStateWithLifecycle()
+  val resume by vm.resume.collectAsStateWithLifecycle()
   var query by rememberSaveable { mutableStateOf("") }
   var filter by rememberSaveable { mutableStateOf("all") }
-  val visible = remember(tracks, query, filter) {
-    tracks.filter { track ->
-      (filter == "all" || (filter == "files" && track.source == TrackSource.LOCAL) || (filter == "online" && track.source != TrackSource.LOCAL)) &&
-        (query.isBlank() || listOf(track.title, track.artist, track.album).any { it.contains(query.trim(), ignoreCase = true) })
+  var sort by rememberSaveable { mutableStateOf("recent") }
+  var sortMenu by remember { mutableStateOf(false) }
+  val visible = remember(tracks, query, filter, favorites, history, sort) {
+    val historyOrder = history.withIndex().associate { it.value to it.index }
+    val filtered = tracks.filter { track ->
+      val matchesFilter = when (filter) {
+        "files" -> track.source == TrackSource.LOCAL
+        "online" -> track.source != TrackSource.LOCAL
+        "favorites" -> track.id in favorites
+        "downloads" -> track.downloadedPath != null
+        "history" -> track.id in historyOrder
+        else -> true
+      }
+      matchesFilter && (query.isBlank() || listOf(track.title, track.artist, track.album).any { it.contains(query.trim(), ignoreCase = true) })
+    }
+    when {
+      sort == "title" -> filtered.sortedBy { it.title.lowercase() }
+      sort == "artist" -> filtered.sortedWith(compareBy({ it.artist.lowercase() }, { it.title.lowercase() }))
+      sort == "duration" -> filtered.sortedByDescending { it.durationMs }
+      filter == "history" -> filtered.sortedBy { historyOrder[it.id] ?: Int.MAX_VALUE }
+      else -> filtered
     }
   }
+  val resumeTrack = remember(tracks, resume) { tracks.find { it.id == resume?.trackId } }
   Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(
       modifier = Modifier.fillMaxWidth().widthIn(max = 820.dp),
@@ -96,6 +122,23 @@ fun LibraryScreen(vm: MusicViewModel, importing: Boolean, onPickFiles: () -> Uni
           }
         }
       }
+      if (resumeTrack != null && resume != null) {
+        item {
+          Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+              TrackArtwork(resumeTrack, 44.dp)
+              Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.resume_listening), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(resumeTrack.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+              }
+              TextButton(onClick = vm::resumeLast) {
+                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
+                Text(formatTime(resume?.positionMs ?: 0L), Modifier.padding(start = 4.dp))
+              }
+            }
+          }
+        }
+      }
       item {
         OutlinedTextField(
           value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -104,10 +147,29 @@ fun LibraryScreen(vm: MusicViewModel, importing: Boolean, onPickFiles: () -> Uni
         )
       }
       item {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          listOf("all" to R.string.filter_all, "files" to R.string.filter_files, "online" to R.string.filter_online).forEach { (id, label) ->
-            FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(stringResource(label)) })
+        Column {
+          FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            listOf("all" to R.string.filter_all, "files" to R.string.filter_files, "online" to R.string.filter_online,
+              "favorites" to R.string.filter_favorites, "downloads" to R.string.filter_downloads, "history" to R.string.filter_history).forEach { (id, label) ->
+              FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(stringResource(label)) })
+            }
           }
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Box {
+              TextButton(onClick = { sortMenu = true }) {
+                Icon(Icons.AutoMirrored.Filled.Sort, null, Modifier.size(18.dp))
+                Text(stringResource(R.string.sort_by), Modifier.padding(start = 6.dp))
+              }
+              DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                listOf("recent" to R.string.sort_recent, "title" to R.string.sort_title, "artist" to R.string.sort_artist,
+                  "duration" to R.string.sort_duration).forEach { (id, label) ->
+                  DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = { sort = id; sortMenu = false })
+                }
+              }
+            }
+            if (filter == "history" && history.isNotEmpty()) TextButton(onClick = vm::clearHistory) { Text(stringResource(R.string.clear_history)) }
+          }
+          if (filter == "history") Text(stringResource(R.string.history_local_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
       }
       if (visible.isEmpty()) {

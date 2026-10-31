@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.content.ComponentName
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -18,6 +19,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.R
 import com.example.audio.DeviceEqualizer
+import com.example.audio.PlaybackEnhancements
 import com.example.audio.PlaybackService
 import com.example.data.cloud.CloudBackup
 import com.example.data.cloud.GoogleAccount
@@ -29,6 +31,7 @@ import com.example.data.library.LibraryDatabase
 import com.example.data.library.LibraryPlaylist
 import com.example.data.library.LibraryRepository
 import com.example.data.library.LibraryTrack
+import com.example.data.library.ListeningStore
 import com.example.data.library.TrackSource
 import com.example.data.library.UnsupportedStreamingPlaylistException
 import com.example.data.library.stableTrackId
@@ -63,6 +66,7 @@ data class PlaybackUiState(
   val canSeek: Boolean = false,
   val shuffle: Boolean = false,
   val repeatMode: Int = Player.REPEAT_MODE_OFF,
+  val queueIndex: Int = -1,
 )
 data class DiscoveryUiState(
   val source: DiscoverySource = DiscoverySource.PREVIEWS,
@@ -80,6 +84,7 @@ data class DownloadProgress(val bytes: Long, val total: Long?)
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
   private val database = LibraryDatabase.get(application)
   private val library = LibraryRepository(application, database)
+  private val listening = ListeningStore(application)
   private val downloads = AudioDownloadManager(application, database)
   private val discovery = MusicDiscovery()
   private val prefs = application.getSharedPreferences("discovery", Application.MODE_PRIVATE)
@@ -89,12 +94,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   private val authListener = FirebaseAuth.AuthStateListener { mutableUser.value = it.currentUser }
   private val downloadJobs = mutableMapOf<String, Job>()
   private var searchJob: Job? = null
-  private var queue: List<LibraryTrack> = emptyList()
+  private val sessionTracks = mutableMapOf<String, LibraryTrack>()
+  private var indexedTracks: Map<String, LibraryTrack> = emptyMap()
+  private var lastHistoryId: String? = null
+  private var lastPositionWrite = 0L
   private var controller: MediaController? = null
 
   val tracks = library.tracks.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
   val playlists = library.playlists.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
   val equalizer = DeviceEqualizer.state
+  val enhancements = PlaybackEnhancements.state
+  val favorites = listening.favorites
+  val history = listening.history
+  val resume = listening.resume
+  private val mutableQueue = MutableStateFlow<List<LibraryTrack>>(emptyList())
+  val queue = mutableQueue.asStateFlow()
   private val mutablePlayback = MutableStateFlow(PlaybackUiState())
   val playback: StateFlow<PlaybackUiState> = mutablePlayback.asStateFlow()
   private val mutableDiscovery = MutableStateFlow(DiscoveryUiState(
@@ -108,6 +122,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   val firebaseConfigured = auth != null && application.resources.getIdentifier("default_web_client_id", "string", application.packageName).let { id ->
     id != 0 && application.getString(id).isNotBlank()
   }
+  private val mutableSignInIssue = MutableStateFlow<String?>(null)
+  val signInIssue = mutableSignInIssue.asStateFlow()
   private val mutableBusy = MutableStateFlow(false)
   val busy = mutableBusy.asStateFlow()
   private val mutableImporting = MutableStateFlow(false)
@@ -123,7 +139,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   ).buildAsync()
 
   private val playerListener = object : Player.Listener {
-    override fun onEvents(player: Player, events: Player.Events) { refreshPlayback(player) }
+    override fun onEvents(player: Player, events: Player.Events) {
+      if (events.contains(Player.EVENT_TIMELINE_CHANGED)) refreshQueue(player)
+      refreshPlayback(player)
+      if (!player.isPlaying) savePosition(player)
+    }
     override fun onPlayerError(error: PlaybackException) {
       notify(R.string.playback_error, safeError(error))
       controller?.let(::refreshPlayback)
@@ -136,28 +156,44 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
       try {
         controller = controllerFuture.get().also {
           it.addListener(playerListener)
+          refreshQueue(it)
           refreshPlayback(it)
         }
       } catch (e: Exception) { notify(R.string.player_unavailable, safeError(e)) }
     }, ContextCompat.getMainExecutor(application))
     viewModelScope.launch {
+      tracks.collect { list ->
+        indexedTracks = list.associateBy { it.id }
+        controller?.let { refreshQueue(it); refreshPlayback(it) }
+      }
+    }
+    viewModelScope.launch {
       while (isActive) {
-        controller?.let(::refreshPlayback)
-        delay(500)
+        val current = controller
+        if (current?.isPlaying == true) {
+          refreshPlayback(current)
+          if (SystemClock.elapsedRealtime() - lastPositionWrite >= 5_000L) savePosition(current)
+        }
+        delay(if (current?.isPlaying == true) 500L else 2_000L)
       }
     }
   }
 
+  private fun trackFromItem(item: MediaItem): LibraryTrack =
+    indexedTracks[item.mediaId] ?: sessionTracks[item.mediaId] ?: LibraryTrack(
+      id = item.mediaId, uri = item.localConfiguration?.uri?.toString().orEmpty(),
+      title = item.mediaMetadata.title?.toString().orEmpty(), artist = item.mediaMetadata.artist?.toString().orEmpty(),
+      album = item.mediaMetadata.albumTitle?.toString().orEmpty(),
+      source = TrackSource.DIRECT, artworkUri = item.mediaMetadata.artworkUri?.toString(),
+    )
+
+  private fun refreshQueue(player: Player) {
+    val list = (0 until player.mediaItemCount).map { trackFromItem(player.getMediaItemAt(it)) }
+    if (mutableQueue.value != list) mutableQueue.value = list
+  }
+
   private fun refreshPlayback(player: Player) {
-    val item = player.currentMediaItem
-    val found = item?.let { current ->
-      tracks.value.find { it.id == current.mediaId } ?: queue.find { it.id == current.mediaId }
-        ?: LibraryTrack(
-          id = current.mediaId, uri = "",
-          title = current.mediaMetadata.title?.toString().orEmpty(), artist = current.mediaMetadata.artist?.toString().orEmpty(),
-          source = TrackSource.DIRECT, artworkUri = current.mediaMetadata.artworkUri?.toString(),
-        )
-    }
+    val found = player.currentMediaItem?.let(::trackFromItem)
     val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
     mutablePlayback.value = PlaybackUiState(
       track = found, isPlaying = player.isPlaying,
@@ -165,30 +201,97 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
       positionMs = player.currentPosition.coerceAtLeast(0), durationMs = duration,
       canSeek = player.isCurrentMediaItemSeekable && duration > 0,
       shuffle = player.shuffleModeEnabled, repeatMode = player.repeatMode,
+      queueIndex = player.currentMediaItemIndex.takeIf { player.currentMediaItem != null } ?: -1,
     )
+    if (player.isPlaying && found != null && found.id != lastHistoryId) {
+      lastHistoryId = found.id
+      listening.recordTrack(found.id)
+    }
   }
 
-  fun play(track: LibraryTrack, list: List<LibraryTrack> = listOf(track)) {
+  private fun savePosition(player: Player) {
+    val id = player.currentMediaItem?.mediaId ?: return
+    lastPositionWrite = SystemClock.elapsedRealtime()
+    listening.recordPosition(id, if (player.isCurrentMediaItemSeekable && player.playbackState != Player.STATE_ENDED) player.currentPosition else 0L)
+  }
+
+  private fun toMediaItem(item: LibraryTrack): MediaItem {
+    val localCopy = item.downloadedPath?.let(::File)?.takeIf { it.isFile }
+    val playbackUri = localCopy?.let(Uri::fromFile) ?: Uri.parse(item.uri)
+    return MediaItem.Builder().setMediaId(item.id).setUri(playbackUri).setMediaMetadata(
+      MediaMetadata.Builder().setTitle(item.title).setArtist(item.artist).setAlbumTitle(item.album)
+        .setArtworkUri(item.artworkUri?.let(Uri::parse)).build()
+    ).build()
+  }
+
+  fun play(track: LibraryTrack, list: List<LibraryTrack> = listOf(track), startPositionMs: Long = 0L) {
     val player = controller ?: run { notify(R.string.player_connecting); return }
-    val playable = list.distinctBy { it.id }
+    val playable = list.distinctBy { it.id }.filter { it.uri.isNotBlank() }
     val startIndex = playable.indexOfFirst { it.id == track.id }
     if (startIndex < 0) return
-    queue = playable
-    val items = playable.map { item ->
-      val localCopy = item.downloadedPath?.let(::File)?.takeIf { it.isFile }
-      val playbackUri = localCopy?.let(Uri::fromFile) ?: Uri.parse(item.uri)
-      MediaItem.Builder().setMediaId(item.id).setUri(playbackUri).setMediaMetadata(
-        MediaMetadata.Builder().setTitle(item.title).setArtist(item.artist).setAlbumTitle(item.album)
-          .setArtworkUri(item.artworkUri?.let(Uri::parse)).build()
-      ).build()
-    }
+    playable.forEach { sessionTracks[it.id] = it }
     try {
-      player.setMediaItems(items, startIndex, 0L)
+      player.setMediaItems(playable.map(::toMediaItem), startIndex, startPositionMs.coerceAtLeast(0))
       player.prepare()
       player.play()
+      refreshQueue(player)
       refreshPlayback(player)
     } catch (e: Exception) { notify(R.string.playback_error, safeError(e)) }
   }
+
+  fun resumeLast() {
+    val point = resume.value ?: return
+    val track = indexedTracks[point.trackId] ?: return
+    play(track, tracks.value, point.positionMs)
+  }
+
+  fun toggleFavorite(track: LibraryTrack) = viewModelScope.launch {
+    try {
+      if (track.id !in favorites.value && track.id !in indexedTracks) {
+        if (track.uri.isBlank()) { notify(R.string.track_unavailable); return@launch }
+        library.addTrack(track)
+      }
+      listening.toggleFavorite(track.id)
+    } catch (e: CancellationException) { throw e }
+    catch (e: Exception) { notify(R.string.action_failed, safeError(e)) }
+  }
+
+  fun clearHistory() = listening.clearHistory()
+
+  fun enqueue(track: LibraryTrack, playNext: Boolean) {
+    val player = controller ?: run { notify(R.string.player_connecting); return }
+    if (track.uri.isBlank()) { notify(R.string.track_unavailable); return }
+    try {
+      sessionTracks[track.id] = track
+      val index = if (playNext && player.currentMediaItem != null) (player.currentMediaItemIndex + 1).coerceAtMost(player.mediaItemCount) else player.mediaItemCount
+      player.addMediaItem(index, toMediaItem(track))
+      if (player.playbackState == Player.STATE_IDLE) player.prepare()
+      refreshQueue(player)
+      notify(if (playNext) R.string.queued_next else R.string.added_to_queue)
+    } catch (e: Exception) { notify(R.string.action_failed, safeError(e)) }
+  }
+
+  fun playQueueItem(index: Int) {
+    controller?.let { player ->
+      if (index in 0 until player.mediaItemCount) { player.seekTo(index, 0); player.prepare(); player.play() }
+    }
+  }
+  fun moveQueueItem(from: Int, to: Int) {
+    controller?.let { player ->
+      if (from in 0 until player.mediaItemCount && to in 0 until player.mediaItemCount) player.moveMediaItem(from, to)
+    }
+  }
+  fun removeQueueItem(index: Int) {
+    controller?.let { player -> if (index in 0 until player.mediaItemCount) player.removeMediaItem(index) }
+  }
+  fun jumpBy(deltaMs: Long) {
+    controller?.let { player -> if (player.isCurrentMediaItemSeekable) {
+      val end = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: Long.MAX_VALUE
+      player.seekTo((player.currentPosition + deltaMs).coerceIn(0L, end))
+    } }
+  }
+  fun setLoopStart() { if (!PlaybackEnhancements.setLoopStart()) notify(R.string.loop_unavailable) }
+  fun setLoopEnd() { if (!PlaybackEnhancements.setLoopEnd()) notify(R.string.loop_invalid_end) }
 
   fun togglePlay() {
     val player = controller ?: return
@@ -238,7 +341,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     catch (e: Exception) { notify(R.string.action_failed, safeError(e)) }
   }
   fun removeTrack(track: LibraryTrack) = viewModelScope.launch {
-    try { downloadJobs[track.id]?.cancel(); downloads.cancel(track.id); library.deleteTrack(track); notify(R.string.removed_from_library) }
+    try { downloadJobs[track.id]?.cancel(); downloads.cancel(track.id); library.deleteTrack(track); listening.removeTrack(track.id); notify(R.string.removed_from_library) }
     catch (e: CancellationException) { throw e }
     catch (e: Exception) { notify(R.string.action_failed, safeError(e)) }
   }
@@ -346,13 +449,24 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
   }
 
-  fun signIn(activity: Activity) = viewModelScope.launch {
+  fun signIn(activity: Activity, useAccountSelector: Boolean = false) = viewModelScope.launch {
     mutableBusy.value = true
-    try { GoogleAccount.signIn(activity); notify(R.string.signed_in) }
-    catch (_: GetCredentialCancellationException) { /* User deliberately dismissed the chooser. */ }
-    catch (_: MissingFirebaseConfiguration) { notify(R.string.firebase_not_configured) }
+    mutableSignInIssue.value = null
+    try { GoogleAccount.signIn(activity, useAccountSelector); notify(R.string.signed_in) }
+    catch (e: GetCredentialCancellationException) {
+      // Some Play Services versions also report configuration failures as cancellation.
+      mutableSignInIssue.value = GoogleAccount.describeFailure(e)
+      notify(R.string.sign_in_cancelled)
+    }
+    catch (_: MissingFirebaseConfiguration) {
+      mutableSignInIssue.value = activity.getString(R.string.firebase_not_configured)
+      notify(R.string.firebase_not_configured)
+    }
     catch (e: CancellationException) { throw e }
-    catch (e: Exception) { notify(R.string.sign_in_failed, safeError(e)) }
+    catch (e: Exception) {
+      mutableSignInIssue.value = GoogleAccount.describeFailure(e)
+      notify(R.string.sign_in_failed, e.javaClass.simpleName)
+    }
     finally { mutableBusy.value = false }
   }
   fun signOut(activity: Activity) = viewModelScope.launch {
@@ -389,6 +503,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   override fun onCleared() {
     downloadJobs.keys.toList().forEach { downloads.cancel(it) }
     auth?.removeAuthStateListener(authListener)
+    controller?.let(::savePosition)
     controller?.removeListener(playerListener)
     MediaController.releaseFuture(controllerFuture)
     mutableNotices.close()

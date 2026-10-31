@@ -1,7 +1,5 @@
 package com.example.ui.player
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -38,6 +40,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,22 +59,29 @@ import com.example.BuildConfig
 import com.example.MainActivity
 import com.example.R
 import com.example.audio.DeviceEqualizer
+import com.example.audio.EqualizerPreset
+import com.example.data.cloud.GoogleAccount
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(vm: MusicViewModel, activity: MainActivity) {
+fun SettingsScreen(vm: MusicViewModel, activity: MainActivity, onAbout: () -> Unit, focusEqualizer: Boolean, onFocusHandled: () -> Unit) {
   val user by vm.user.collectAsStateWithLifecycle()
   val busy by vm.busy.collectAsStateWithLifecycle()
   val eq by vm.equalizer.collectAsStateWithLifecycle()
+  val signInIssue by vm.signInIssue.collectAsStateWithLifecycle()
+  val listState = rememberLazyListState()
+  LaunchedEffect(focusEqualizer) { if (focusEqualizer) { listState.animateScrollToItem(3); onFocusHandled() } }
   var backupConfirm by rememberSaveable { mutableStateOf(false) }
   var restoreConfirm by rememberSaveable { mutableStateOf(false) }
   var languageMenu by remember { mutableStateOf(false) }
+  var presetMenu by remember { mutableStateOf(false) }
+  var diagnosticsOpen by rememberSaveable { mutableStateOf(false) }
   val currentLanguage = activity.getSharedPreferences("language", android.content.Context.MODE_PRIVATE).getString("locale", "system") ?: "system"
   val languages = listOf("system" to stringResource(R.string.follow_system), "en" to "English", "zh-CN" to "简体中文", "zh-TW" to "繁體中文", "ja" to "日本語", "ko" to "한국어", "es" to "Español", "de" to "Deutsch")
 
   Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-    LazyColumn(Modifier.fillMaxWidth().widthIn(max = 820.dp),
+    LazyColumn(Modifier.fillMaxWidth().widthIn(max = 820.dp), state = listState,
       contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 36.dp),
       verticalArrangement = Arrangement.spacedBy(18.dp)) {
       item { PageHeader(stringResource(R.string.settings_eyebrow), stringResource(R.string.settings_title), stringResource(R.string.settings_subtitle)) }
@@ -92,13 +104,24 @@ fun SettingsScreen(vm: MusicViewModel, activity: MainActivity) {
           }
           if (!vm.firebaseConfigured) Text(stringResource(R.string.firebase_config_help), color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
           if (user == null) {
-            Button(onClick = { vm.signIn(activity) }, enabled = !busy) {
-              if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-              Text(stringResource(R.string.sign_in_google), modifier = Modifier.padding(start = if (busy) 8.dp else 0.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+              Button(onClick = { vm.signIn(activity) }, enabled = !busy) {
+                if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text(stringResource(R.string.sign_in_google), modifier = Modifier.padding(start = if (busy) 8.dp else 0.dp))
+              }
+              OutlinedButton(onClick = { vm.signIn(activity, useAccountSelector = true) }, enabled = !busy) {
+                Text(stringResource(R.string.sign_in_account_selector))
+              }
             }
+            Text(stringResource(R.string.sign_in_alternative_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           } else {
             OutlinedButton(onClick = { vm.signOut(activity) }, enabled = !busy) { Text(stringResource(R.string.sign_out)) }
           }
+          signInIssue?.let { issue ->
+            Text(stringResource(R.string.sign_in_latest_issue), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+            Text(issue, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+          TextButton(onClick = { diagnosticsOpen = true }) { Text(stringResource(R.string.sign_in_diagnostics)) }
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           Text(stringResource(R.string.cloud_scope), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -144,6 +167,19 @@ fun SettingsScreen(vm: MusicViewModel, activity: MainActivity) {
                 Text(stringResource(R.string.enable_equalizer), modifier = Modifier.weight(1f))
                 Switch(checked = eq.enabled, onCheckedChange = DeviceEqualizer::setEnabled)
               }
+              Box {
+                OutlinedButton(onClick = { presetMenu = true }, enabled = eq.enabled) {
+                  Text(stringResource(eq.preset?.let(::presetLabel) ?: R.string.eq_custom))
+                  Icon(Icons.Default.ExpandMore, null, Modifier.padding(start = 4.dp))
+                }
+                DropdownMenu(expanded = presetMenu, onDismissRequest = { presetMenu = false }) {
+                  EqualizerPreset.entries.forEach { preset ->
+                    DropdownMenuItem(text = { Text(stringResource(presetLabel(preset))) },
+                      onClick = { presetMenu = false; DeviceEqualizer.applyPreset(preset) })
+                  }
+                }
+              }
+              Text(stringResource(R.string.eq_preset_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               eq.bands.forEach { band ->
                 Column {
                   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -166,13 +202,12 @@ fun SettingsScreen(vm: MusicViewModel, activity: MainActivity) {
         SettingsCard {
           SectionTitle(stringResource(R.string.about_title), stringResource(R.string.about_body))
           Text("AuraPulse ${BuildConfig.VERSION_NAME} · AGPL-3.0-or-later", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-          TextButton(onClick = { runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Hotsteel2901/AuraPulse"))) } }) {
-            Text(stringResource(R.string.view_source))
-          }
+          OutlinedButton(onClick = onAbout) { Text(stringResource(R.string.open_about)) }
         }
       }
     }
   }
+  if (diagnosticsOpen) SignInDiagnosticsDialog(activity, signInIssue) { diagnosticsOpen = false }
   if (backupConfirm) AlertDialog(
     onDismissRequest = { backupConfirm = false }, title = { Text(stringResource(R.string.backup_confirm_title)) },
     text = { Text(stringResource(R.string.backup_confirm_body)) },
@@ -192,4 +227,50 @@ private fun SettingsCard(content: @Composable androidx.compose.foundation.layout
   Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth()) {
     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = content)
   }
+}
+
+
+@androidx.annotation.StringRes
+private fun presetLabel(preset: EqualizerPreset): Int = when (preset) {
+  EqualizerPreset.FLAT -> R.string.eq_flat
+  EqualizerPreset.BASS_BOOST -> R.string.eq_bass_boost
+  EqualizerPreset.BASS_REDUCER -> R.string.eq_bass_reducer
+  EqualizerPreset.TREBLE_BOOST -> R.string.eq_treble_boost
+  EqualizerPreset.VOCAL -> R.string.eq_vocal
+  EqualizerPreset.CLASSICAL -> R.string.eq_classical
+  EqualizerPreset.DANCE -> R.string.eq_dance
+  EqualizerPreset.JAZZ -> R.string.eq_jazz
+  EqualizerPreset.ROCK -> R.string.eq_rock
+  EqualizerPreset.ELECTRONIC -> R.string.eq_electronic
+  EqualizerPreset.ACOUSTIC -> R.string.eq_acoustic
+  EqualizerPreset.POP -> R.string.eq_pop
+}
+
+@Composable
+private fun SignInDiagnosticsDialog(activity: MainActivity, issue: String?, onDismiss: () -> Unit) {
+  val diagnostics = remember(activity) { GoogleAccount.diagnostics(activity) }
+  val clipboard = LocalClipboardManager.current
+  val unknown = stringResource(R.string.diagnostics_unknown)
+  val status = diagnostics.playServicesStatus?.let { if (it == 0) stringResource(R.string.diagnostics_available) else "${it}" } ?: unknown
+  val sha1 = diagnostics.sha1.joinToString("\n").ifBlank { unknown }
+  val sha256 = diagnostics.sha256.joinToString("\n").ifBlank { unknown }
+  AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.sign_in_diagnostics)) },
+    text = {
+      Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(stringResource(R.string.diagnostics_explanation), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.diagnostics_package, diagnostics.packageName))
+        Text(stringResource(R.string.diagnostics_project, diagnostics.projectId ?: unknown))
+        Text(stringResource(R.string.diagnostics_web_client, stringResource(if (diagnostics.webClientConfigured) R.string.diagnostics_available else R.string.diagnostics_missing)))
+        Text(stringResource(R.string.diagnostics_play_services, status))
+        Text("SHA-1\n$sha1", style = MaterialTheme.typography.bodySmall)
+        Text("SHA-256\n$sha256", style = MaterialTheme.typography.bodySmall)
+        if (issue != null) Text(issue, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        Text(stringResource(R.string.diagnostics_firebase_steps), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = { clipboard.setText(AnnotatedString("SHA-1: $sha1\nSHA-256: $sha256")) }) {
+          Text(stringResource(R.string.copy_fingerprints))
+        }
+      }
+    },
+    confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
+  )
 }
