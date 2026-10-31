@@ -1,0 +1,47 @@
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+             SPDX-License-Identifier: AGPL-3.0-or-later
+
+ Copyright (C) 2026 Hotsteel2901 (github@Hotsteel2901 / https://github.com/Hotsteel2901)
+ Project: AuraPulse — Material 3 Expressive High-Fidelity Music Player & Universal Music Source API Client
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Affero General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version (AGPL-3.0-or-later).
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU Affero General Public License for more details.
+
+ You should have received a copy of the GNU Affero General Public License
+ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+===========================================================================
+                            PREAMBLE & SUMMARY
+===========================================================================
+
+  The GNU Affero General Public License is a free, copyleft license for
+software and other kinds of works, specifically designed to ensure
+cooperation with the community in the case of network server software and
+connected client-server applications.
+
+  1. Freedom to Run: You are free to run AuraPulse for any purpose, across
+     any country or region worldwide.
+  2. Freedom to Study & Modify: You have the right to inspect the audio DSP
+     pipeline, 10-band parametric biquad filters, and Universal Custom Music
+     Source API adapters, and adapt them to your needs.
+  3. Network Interaction & Source Availability (Section 13): If you modify
+     this program and let users interact with it remotely through a computer
+     network, your modified version must prominently offer all users
+     interacting with it an opportunity to receive the Corresponding Source
+     under the AGPL-3.0-or-later license.
+  4. Copyleft Protection: All derivative works and redistributed versions
+     must remain free and open under the GNU AGPL v3.0 or any later version
+     published by the Free Software Foundation.
+
+  Author & Maintainer:
+    Developer: Hotsteel2901
+    GitHub:    https://github.com/Hotsteel2901 (github@Hotsteel2901)
+    License:   AGPL-3.0-or-later

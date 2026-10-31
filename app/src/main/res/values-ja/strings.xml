@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">AuraPulse</string>
+    <string name="tagline_audiophile">24-Bit / 192kHz ロスレス Hi-Fi プレーヤー</string>
+    <string name="sign_in_with_google">Google でサインイン</string>
+    <string name="auth_headline">スタジオマスターの音響体験</string>
+    <string name="auth_subtitle">Google でサインインして、全世界対応のカスタム音源 API、プレイリスト、10バンドパラメトリック EQ、デバイス間再生引き継ぎを同期します。</string>
+    <string name="nav_discover">Hi-Fi デッキ</string>
+    <string name="nav_playlists">プレイリスト</string>
+    <string name="nav_equalizer">10バンド EQ</string>
+    <string name="nav_cloud_sync">音源 API</string>
+    <string name="nav_config_about">設定・情報</string>
+    <string name="create_playlist">新規プレイリスト</string>
+    <string name="save_eq_profile">EQ プロファイル保存</string>
+    <string name="bit_perfect_dac">USB / 内蔵 Hi-Res DAC ビットパーフェクト</string>
+    <string name="offline_vault_title">オフライン FLAC ボールト</string>
+    <string name="custom_sources_title">ユニバーサル音源 API（全地域・全国対応）</string>
+    <string name="developer_handle">github@Hotsteel2901</string>
+    <string name="license_spdx">AGPL-3.0-or-later</string>
+    <string name="sign_out">サインアウト</string>
+</resources>

@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">AuraPulse</string>
+    <string name="tagline_audiophile">24-Bit / 192kHz 无损高保真灵动播放器</string>
+    <string name="sign_in_with_google">使用 Google 账号登录</string>
+    <string name="auth_headline">臻享录音室母带级原音</string>
+    <string name="auth_subtitle">使用 Google 登录以跨设备同步全球全区域自定义音源 API、歌单、10 段参量均衡器配置及无缝播放接力。</string>
+    <string name="nav_discover">母带唱机</string>
+    <string name="nav_playlists">臻选歌单</string>
+    <string name="nav_equalizer">参量均衡</string>
+    <string name="nav_cloud_sync">音源与同步</string>
+    <string name="nav_config_about">设置与关于</string>
+    <string name="create_playlist">新建歌单</string>
+    <string name="save_eq_profile">保存音效配置</string>
+    <string name="bit_perfect_dac">USB / 内置高清 DAC 源码直通 (Bit-Perfect)</string>
+    <string name="offline_vault_title">离线无损 FLAC 音乐金库</string>
+    <string name="custom_sources_title">全球通用自定义音源 API（支持所有国家与地区）</string>
+    <string name="developer_handle">github@Hotsteel2901</string>
+    <string name="license_spdx">AGPL-3.0-or-later</string>
+    <string name="sign_out">退出登录</string>
+</resources>

@@ -1,0 +1,161 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Hotsteel2901 (github@Hotsteel2901)
+# AuraPulse — Automated GitHub Actions CI Build & Verification Workflow
+
+name: AuraPulse Android CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '21'
+  NODE_VERSION: '22'
+  GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=4 -Xmx4g'
+
+jobs:
+  firestore-rules-and-license-audit:
+    name: License (AGPL-3.0-or-later) & Firestore Rules CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify AGPL-3.0-or-later License & Metadata
+        run: |
+          test -f LICENSE
+          grep -q "AGPL-3.0-or-later" LICENSE
+          test -f firebase-blueprint.json
+          test -f firestore.rules
+
+      - name: Set up Java ${{ env.JAVA_VERSION }} (for Firebase Firestore Emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Latest Firebase Emulator CLI & Rules Unit Testing SDK
+        run: |
+          npm install -g firebase-tools@latest
+          npm install --no-save @firebase/rules-unit-testing@latest firebase@latest
+
+      - name: Execute Tier 1 Firestore Security Rules Suite
+        run: |
+          firebase emulators:exec --only firestore --project demo-no-project "node --test firestore.test.js"
+
+  android-build-and-test:
+    name: Android APK Build & Robolectric Test Suite
+    runs-on: ubuntu-latest
+    needs: firestore-rules-and-license-audit
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }} (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }} (for Emulator-Backed Unit Tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Configure Gradle with Latest GitHub Actions Integration
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
+
+      - name: Prepare Debug Keystore & Environment Defaults
+        run: |
+          if [ ! -f debug.keystore ]; then
+            if [ -f debug.keystore.base64 ]; then
+              base64 -d debug.keystore.base64 > debug.keystore
+            else
+              keytool -genkeypair -v \
+                -keystore debug.keystore \
+                -storepass android \
+                -alias androiddebugkey \
+                -keypass android \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US"
+            fi
+          fi
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
+      - name: Ensure Gradle Wrapper Executable Permission
+        run: |
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+          fi
+
+      - name: Assemble Debug APK
+        run: |
+          if [ -f ./gradlew ]; then
+            ./gradlew :app:assembleDebug --stacktrace
+          else
+            gradle :app:assembleDebug --stacktrace
+          fi
+
+      - name: Start Firebase Emulators & Run Unit + Robolectric Tests
+        run: |
+          npm install -g firebase-tools@latest
+          (setsid nohup firebase emulators:start --only firestore,auth --project demo-no-project > /tmp/firebase-emulators.log 2>&1 < /dev/null &)
+          for i in $(seq 1 90); do
+            if curl -s -o /dev/null http://127.0.0.1:8085 && curl -s -o /dev/null http://127.0.0.1:9099; then
+              echo "Firebase Emulators ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          if [ -f ./gradlew ]; then
+            ./gradlew :app:testDebugUnitTest --stacktrace
+          else
+            gradle :app:testDebugUnitTest --stacktrace
+          fi
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurapulse-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Unit & Robolectric Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurapulse-unit-test-reports
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14

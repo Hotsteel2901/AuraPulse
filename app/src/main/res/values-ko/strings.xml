@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">AuraPulse</string>
+    <string name="tagline_audiophile">24-Bit / 192kHz 무손실 하이파이 플레이어</string>
+    <string name="sign_in_with_google">Google 계정으로 로그인</string>
+    <string name="auth_headline">스튜디오 마스터 사운드 경험</string>
+    <string name="auth_subtitle">Google 로그인으로 전 세계 커스텀 음악 API 소스, 플레이리스트, 10밴드 파라메트릭 EQ 프로필 및 교차 기기 재생을 동기화하세요.</string>
+    <string name="nav_discover">하이파이 덱</string>
+    <string name="nav_playlists">플레이리스트</string>
+    <string name="nav_equalizer">파라메트릭 EQ</string>
+    <string name="nav_cloud_sync">커스텀 API</string>
+    <string name="nav_config_about">설정 및 정보</string>
+    <string name="create_playlist">새 플레이리스트</string>
+    <string name="save_eq_profile">사운드 프로필 저장</string>
+    <string name="bit_perfect_dac">USB / 내장 Hi-Res DAC 비트퍼펙트 모드</string>
+    <string name="offline_vault_title">오프라인 무손실 FLAC 보관함</string>
+    <string name="custom_sources_title">범용 커스텀 음악 소스 API (전 세계 모든 국가 지원)</string>
+    <string name="developer_handle">github@Hotsteel2901</string>
+    <string name="license_spdx">AGPL-3.0-or-later</string>
+    <string name="sign_out">로그아웃</string>
+</resources>

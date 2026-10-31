@@ -1,0 +1,299 @@
+{
+  "entities": {
+    "Playlist": {
+      "title": "Playlist",
+      "description": "Custom audiophile playlist synced across devices and custom music API sources.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title of the playlist (1..80 chars)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Subtitle or mood description (0..240 chars)."
+        },
+        "accentHex": {
+          "type": "string",
+          "description": "Hex color accent for dynamic expressive theming (e.g. #00F5D4)."
+        },
+        "sourceService": {
+          "type": "string",
+          "enum": ["AURA_HIFI", "CUSTOM_API", "SUBSONIC", "OPEN_GLOBAL", "HYBRID"],
+          "description": "Primary custom music API source or hybrid provider."
+        },
+        "isOfflinePinned": {
+          "type": "boolean",
+          "description": "Whether the playlist tracks are pinned for offline FLAC/WAV storage."
+        },
+        "trackIds": {
+          "type": "array",
+          "description": "Ordered list of track IDs (max 100 tracks)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "description",
+        "accentHex",
+        "sourceService",
+        "isOfflinePinned",
+        "trackIds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CustomMusicSource": {
+      "title": "CustomMusicSource",
+      "description": "User-defined custom or open music API endpoint supporting all countries and regions.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the custom music API source (1..80 chars)."
+        },
+        "baseUrl": {
+          "type": "string",
+          "description": "Base HTTP/HTTPS endpoint URL (8..300 chars)."
+        },
+        "searchPath": {
+          "type": "string",
+          "description": "Relative search path or query template (0..200 chars)."
+        },
+        "protocolType": {
+          "type": "string",
+          "enum": [
+            "OPEN_REST_JSON",
+            "SUBSONIC_NAVIDROME",
+            "RADIO_BROWSER_GLOBAL",
+            "ARCHIVE_LOSSLESS",
+            "JELLYFIN_AUDIO"
+          ],
+          "description": "Adapter protocol used to parse tracks and streams."
+        },
+        "regionCode": {
+          "type": "string",
+          "description": "Country/Area code for global routing (e.g. GLOBAL, US, JP, KR, DE, GB, TW, SG, BR, IN, FR, AU)."
+        },
+        "customHeaderName": {
+          "type": "string",
+          "description": "Optional HTTP header name for custom authentication or routing (0..80 chars)."
+        },
+        "customHeaderValue": {
+          "type": "string",
+          "description": "Optional HTTP header value or token (0..240 chars)."
+        },
+        "preferredCodec": {
+          "type": "string",
+          "description": "Preferred audio codec label (1..40 chars, e.g. FLAC Hi-Res)."
+        },
+        "isEnabled": {
+          "type": "boolean",
+          "description": "Whether this custom API source is active for global search and streaming."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "baseUrl",
+        "searchPath",
+        "protocolType",
+        "regionCode",
+        "customHeaderName",
+        "customHeaderValue",
+        "preferredCodec",
+        "isEnabled",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SoundProfile": {
+      "title": "SoundProfile",
+      "description": "Personalized 10-band parametric equalizer and audiophile DSP profile.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Profile name (1..60 chars)."
+        },
+        "presetCategory": {
+          "type": "string",
+          "enum": ["FLAT_STUDIO", "WARM_TUBE", "BASS_SURGE", "VOCAL_CLARITY", "HARMAN_TARGET", "CUSTOM"],
+          "description": "Acoustic target curve category."
+        },
+        "bandsDb": {
+          "type": "array",
+          "description": "10 integer values representing gain in tenths of dB (-120 to +120)."
+        },
+        "preampGainTenths": {
+          "type": "integer",
+          "description": "Pre-amplifier gain in tenths of dB (-120 to +120)."
+        },
+        "bassBoostPercent": {
+          "type": "integer",
+          "description": "Sub-bass harmonic enhancement percentage (0..100)."
+        },
+        "spatializerStrength": {
+          "type": "integer",
+          "description": "Crossfeed & soundstage width percentage (0..100)."
+        },
+        "dacBitPerfectMode": {
+          "type": "boolean",
+          "description": "Whether USB/Internal Hi-Res DAC bit-perfect bypass is enabled."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether this profile is currently active."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "presetCategory",
+        "bandsDb",
+        "preampGainTenths",
+        "bassBoostPercent",
+        "spatializerStrength",
+        "dacBitPerfectMode",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SyncState": {
+      "title": "SyncState",
+      "description": "Cross-platform playback handoff and active custom music API status.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "Name of the synced playback device (1..80 chars)."
+        },
+        "activeTrackId": {
+          "type": "string",
+          "description": "Currently loaded track ID (1..64 chars)."
+        },
+        "positionMs": {
+          "type": "integer",
+          "description": "Playback position in milliseconds (>= 0)."
+        },
+        "isPlaying": {
+          "type": "boolean",
+          "description": "Whether playback is active on this session."
+        },
+        "activeService": {
+          "type": "string",
+          "enum": ["AURA_HIFI", "CUSTOM_API", "SUBSONIC", "OPEN_GLOBAL"],
+          "description": "Active streaming engine."
+        },
+        "audioQualityBadge": {
+          "type": "string",
+          "description": "Current codec/sample-rate badge (1..60 chars, e.g. 24-bit/192kHz FLAC)."
+        },
+        "activeSourceName": {
+          "type": "string",
+          "description": "Name of the active custom music API source (1..80 chars)."
+        },
+        "regionCode": {
+          "type": "string",
+          "description": "Active country/region routing code (2..16 chars)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "deviceName",
+        "activeTrackId",
+        "positionMs",
+        "isPlaying",
+        "activeService",
+        "audioQualityBadge",
+        "activeSourceName",
+        "regionCode",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/playlists/{playlistId}": {
+      "schema": {
+        "$ref": "#/entities/Playlist"
+      },
+      "description": "User custom playlists synced across devices and custom music APIs."
+    },
+    "/users/{userId}/customSources/{sourceId}": {
+      "schema": {
+        "$ref": "#/entities/CustomMusicSource"
+      },
+      "description": "User-defined custom music APIs with multi-country/region support."
+    },
+    "/users/{userId}/soundProfiles/{profileId}": {
+      "schema": {
+        "$ref": "#/entities/SoundProfile"
+      },
+      "description": "User personalized 10-band equalizer and audiophile DSP presets."
+    },
+    "/users/{userId}/syncState/{deviceId}": {
+      "schema": {
+        "$ref": "#/entities/SyncState"
+      },
+      "description": "Cross-platform playback state and active custom music API info."
+    }
+  }
+}

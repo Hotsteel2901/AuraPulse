@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">AuraPulse</string>
+    <string name="tagline_audiophile">24-Bit / 192kHz Lossless Expressive Player</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="auth_headline">Experience Studio Master Sound</string>
+    <string name="auth_subtitle">Sign in with Google to synchronize custom music API sources across all countries/regions, playlists, 10-band parametric EQ sound profiles, and cross-platform playback handoff.</string>
+    <string name="nav_discover">Hi-Fi Deck</string>
+    <string name="nav_playlists">Playlists</string>
+    <string name="nav_equalizer">Parametric EQ</string>
+    <string name="nav_cloud_sync">Custom APIs</string>
+    <string name="nav_config_about">Config &amp; About</string>
+    <string name="create_playlist">New Playlist</string>
+    <string name="save_eq_profile">Save Sound Profile</string>
+    <string name="bit_perfect_dac">USB / Internal Hi-Res DAC Bit-Perfect Mode</string>
+    <string name="offline_vault_title">Offline Hi-Res FLAC Vault</string>
+    <string name="custom_sources_title">Universal Custom Music Source APIs (All Countries &amp; Regions)</string>
+    <string name="developer_handle">github@Hotsteel2901</string>
+    <string name="license_spdx">AGPL-3.0-or-later</string>
+    <string name="sign_out">Sign Out</string>
+</resources>

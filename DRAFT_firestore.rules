@@ -1,0 +1,185 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidPlaylist(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 80 &&
+             data.description is string && data.description.size() >= 0 && data.description.size() <= 240 &&
+             data.accentHex is string && data.accentHex.size() >= 4 && data.accentHex.size() <= 9 &&
+             data.sourceService is string && data.sourceService.size() <= 20 &&
+             data.sourceService in ['AURA_HIFI', 'CUSTOM_API', 'SUBSONIC', 'OPEN_GLOBAL', 'HYBRID'] &&
+             data.isOfflinePinned is bool &&
+             data.trackIds is list && data.trackIds.size() <= 100 &&
+             (data.trackIds.size() == 0 || (data.trackIds[0] is string && data.trackIds[0].size() <= 64)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCustomMusicSource(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.baseUrl is string && data.baseUrl.size() >= 8 && data.baseUrl.size() <= 300 &&
+             data.searchPath is string && data.searchPath.size() >= 0 && data.searchPath.size() <= 200 &&
+             data.protocolType is string && data.protocolType.size() <= 30 &&
+             data.protocolType in ['OPEN_REST_JSON', 'SUBSONIC_NAVIDROME', 'RADIO_BROWSER_GLOBAL', 'ARCHIVE_LOSSLESS', 'JELLYFIN_AUDIO'] &&
+             data.regionCode is string && data.regionCode.size() >= 2 && data.regionCode.size() <= 16 &&
+             data.customHeaderName is string && data.customHeaderName.size() >= 0 && data.customHeaderName.size() <= 80 &&
+             data.customHeaderValue is string && data.customHeaderValue.size() >= 0 && data.customHeaderValue.size() <= 240 &&
+             data.preferredCodec is string && data.preferredCodec.size() >= 1 && data.preferredCodec.size() <= 40 &&
+             data.isEnabled is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSoundProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 60 &&
+             data.presetCategory is string && data.presetCategory.size() <= 30 &&
+             data.presetCategory in ['FLAT_STUDIO', 'WARM_TUBE', 'BASS_SURGE', 'VOCAL_CLARITY', 'HARMAN_TARGET', 'CUSTOM'] &&
+             data.bandsDb is list && data.bandsDb.size() == 10 &&
+             data.bandsDb[0] is int && data.bandsDb[0] >= -120 && data.bandsDb[0] <= 120 &&
+             data.preampGainTenths is int && data.preampGainTenths >= -120 && data.preampGainTenths <= 120 &&
+             data.bassBoostPercent is int && data.bassBoostPercent >= 0 && data.bassBoostPercent <= 100 &&
+             data.spatializerStrength is int && data.spatializerStrength >= 0 && data.spatializerStrength <= 100 &&
+             data.dacBitPerfectMode is bool &&
+             data.isActive is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSyncState(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 80 &&
+             data.activeTrackId is string && data.activeTrackId.size() >= 1 && data.activeTrackId.size() <= 64 &&
+             data.positionMs is int && data.positionMs >= 0 && data.positionMs <= 86400000 &&
+             data.isPlaying is bool &&
+             data.activeService is string && data.activeService.size() <= 20 &&
+             data.activeService in ['AURA_HIFI', 'CUSTOM_API', 'SUBSONIC', 'OPEN_GLOBAL'] &&
+             data.audioQualityBadge is string && data.audioQualityBadge.size() >= 1 && data.audioQualityBadge.size() <= 60 &&
+             data.activeSourceName is string && data.activeSourceName.size() >= 1 && data.activeSourceName.size() <= 80 &&
+             data.regionCode is string && data.regionCode.size() >= 2 && data.regionCode.size() <= 16 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 4. Scoped User Collections
+    match /users/{userId} {
+      match /playlists/{playlistId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(playlistId) &&
+                      request.auth.uid == userId && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && request.auth.uid == userId &&
+                       existing().userId == request.auth.uid;
+
+        allow create: if isSignedIn() && isValidId(userId) && isValidId(playlistId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'title', 'description', 'accentHex', 'sourceService', 'isOfflinePinned', 'trackIds', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'description', 'accentHex', 'sourceService', 'isOfflinePinned', 'trackIds', 'createdAt', 'updatedAt']) &&
+                         isValidPlaylist(incoming());
+
+        allow update: if isSignedIn() && isValidPlaylist(incoming()) &&
+                         isValidId(userId) && isValidId(playlistId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'accentHex', 'sourceService', 'isOfflinePinned', 'trackIds', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(playlistId) &&
+                         request.auth.uid == userId && existing().userId == request.auth.uid;
+      }
+
+      match /customSources/{sourceId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(sourceId) &&
+                      request.auth.uid == userId && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && request.auth.uid == userId &&
+                       existing().userId == request.auth.uid;
+
+        allow create: if isSignedIn() && isValidId(userId) && isValidId(sourceId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'name', 'baseUrl', 'searchPath', 'protocolType', 'regionCode', 'customHeaderName', 'customHeaderValue', 'preferredCodec', 'isEnabled', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'baseUrl', 'searchPath', 'protocolType', 'regionCode', 'customHeaderName', 'customHeaderValue', 'preferredCodec', 'isEnabled', 'createdAt', 'updatedAt']) &&
+                         isValidCustomMusicSource(incoming());
+
+        allow update: if isSignedIn() && isValidCustomMusicSource(incoming()) &&
+                         isValidId(userId) && isValidId(sourceId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'baseUrl', 'searchPath', 'protocolType', 'regionCode', 'customHeaderName', 'customHeaderValue', 'preferredCodec', 'isEnabled', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(sourceId) &&
+                         request.auth.uid == userId && existing().userId == request.auth.uid;
+      }
+
+      match /soundProfiles/{profileId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(profileId) &&
+                      request.auth.uid == userId && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && request.auth.uid == userId &&
+                       existing().userId == request.auth.uid;
+
+        allow create: if isSignedIn() && isValidId(userId) && isValidId(profileId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'name', 'presetCategory', 'bandsDb', 'preampGainTenths', 'bassBoostPercent', 'spatializerStrength', 'dacBitPerfectMode', 'isActive', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'presetCategory', 'bandsDb', 'preampGainTenths', 'bassBoostPercent', 'spatializerStrength', 'dacBitPerfectMode', 'isActive', 'createdAt', 'updatedAt']) &&
+                         isValidSoundProfile(incoming());
+
+        allow update: if isSignedIn() && isValidSoundProfile(incoming()) &&
+                         isValidId(userId) && isValidId(profileId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'presetCategory', 'bandsDb', 'preampGainTenths', 'bassBoostPercent', 'spatializerStrength', 'dacBitPerfectMode', 'isActive', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(profileId) &&
+                         request.auth.uid == userId && existing().userId == request.auth.uid;
+      }
+
+      match /syncState/{deviceId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(deviceId) &&
+                      request.auth.uid == userId && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && request.auth.uid == userId &&
+                       existing().userId == request.auth.uid;
+
+        allow create: if isSignedIn() && isValidId(userId) && isValidId(deviceId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'deviceName', 'activeTrackId', 'positionMs', 'isPlaying', 'activeService', 'audioQualityBadge', 'activeSourceName', 'regionCode', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'deviceName', 'activeTrackId', 'positionMs', 'isPlaying', 'activeService', 'audioQualityBadge', 'activeSourceName', 'regionCode', 'createdAt', 'updatedAt']) &&
+                         isValidSyncState(incoming());
+
+        allow update: if isSignedIn() && isValidSyncState(incoming()) &&
+                         isValidId(userId) && isValidId(deviceId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['deviceName', 'activeTrackId', 'positionMs', 'isPlaying', 'activeService', 'audioQualityBadge', 'activeSourceName', 'regionCode', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(deviceId) &&
+                         request.auth.uid == userId && existing().userId == request.auth.uid;
+      }
+    }
+  }
+}
