@@ -24,6 +24,7 @@ import kotlinx.coroutines.tasks.await
 
 class MissingFirebaseConfiguration : IllegalStateException()
 class CredentialFlowsFailed(val buttonError: Throwable, val selectorError: Throwable) : Exception("Google credential flows failed", selectorError)
+class CredentialFallbackCancelled(val buttonError: Throwable, val selectorError: GetCredentialCancellationException) : Exception("Google account selector cancelled", selectorError)
 class FirebaseTokenExchangeFailed(cause: Throwable) : Exception("Firebase token exchange failed", cause)
 
 data class GoogleSignInDiagnostics(
@@ -60,7 +61,7 @@ object GoogleAccount {
       } catch (buttonError: Exception) {
         // Preserve both errors; the fallback used to silently discard the original failure.
         try { manager.getCredential(activity, selectorRequest) }
-        catch (cancelled: GetCredentialCancellationException) { throw cancelled }
+        catch (cancelled: GetCredentialCancellationException) { throw CredentialFallbackCancelled(buttonError, cancelled) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (selectorError: Exception) { throw CredentialFlowsFailed(buttonError, selectorError) }
       }
@@ -121,6 +122,7 @@ object GoogleAccount {
     }
     return when (error) {
       is CredentialFlowsFailed -> "Button: ${detail(error.buttonError)}\nAccount selector: ${detail(error.selectorError)}"
+      is CredentialFallbackCancelled -> "Button: ${detail(error.buttonError)}\nAccount selector: ${detail(error.selectorError)}"
       is FirebaseTokenExchangeFailed -> "Firebase: ${detail(error.cause ?: error)}"
       else -> detail(error)
     }

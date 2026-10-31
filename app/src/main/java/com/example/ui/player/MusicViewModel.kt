@@ -21,6 +21,7 @@ import com.example.audio.DeviceEqualizer
 import com.example.audio.PlaybackEnhancements
 import com.example.audio.PlaybackService
 import com.example.data.cloud.CloudBackup
+import com.example.data.cloud.CredentialFallbackCancelled
 import com.example.data.cloud.GoogleAccount
 import com.example.data.cloud.MissingFirebaseConfiguration
 import com.example.data.discovery.DiscoverySource
@@ -437,6 +438,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     mutableBusy.value = true
     mutableSignInIssue.value = null
     try { GoogleAccount.signIn(activity, useAccountSelector); notify(R.string.signed_in) }
+    catch (e: CredentialFallbackCancelled) {
+      mutableSignInIssue.value = GoogleAccount.describeFailure(e)
+      notify(R.string.sign_in_cancelled)
+    }
     catch (e: GetCredentialCancellationException) {
       // Some Play Services versions also report configuration failures as cancellation.
       mutableSignInIssue.value = GoogleAccount.describeFailure(e)

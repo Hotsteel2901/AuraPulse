@@ -1,5 +1,6 @@
 package com.example.data.cloud
 
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,6 +16,14 @@ class GoogleAccountDiagnosticsTest {
     assertFalse(summary.contains("account@example.com"))
     assertFalse(summary.contains("secret"))
     assertFalse(summary.contains("abc"))
+  }
+
+  @Test fun fallbackCancellationDoesNotHideTheOriginalButtonFailure() {
+    val summary = GoogleAccount.describeFailure(CredentialFallbackCancelled(
+      IllegalStateException(), GetCredentialCancellationException("cancelled"),
+    ))
+    assertTrue(summary.contains("IllegalStateException"))
+    assertTrue(summary.contains("GetCredentialCancellationException"))
   }
 
   @Test fun bothCredentialErrorsRemainVisible() {
