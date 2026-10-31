@@ -2,5 +2,7 @@
   "name": "AuraPulse",
   "description": "Material Design 3 Expressive hi-fi music player with custom playlists, offline storage, dynamic colors, user-extensible global custom music source APIs, cross-platform cloud sync, and 10-band parametric equalizer.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

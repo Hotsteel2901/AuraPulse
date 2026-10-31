@@ -28,7 +28,8 @@ concurrency:
 env:
   JAVA_VERSION: '21'
   NODE_VERSION: '22'
-  GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=4 -Xmx4g'
+  GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=4 -Djava.awt.headless=true -Xmx4g'
+  JAVA_TOOL_OPTIONS: '-Djava.awt.headless=true'
 
 jobs:
   firestore-rules-and-license-audit:
@@ -91,7 +92,7 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
 
-      - name: Prepare Debug Keystore & Environment Defaults
+      - name: Prepare Debug Keystore, Firebase Config & Environment Defaults
         run: |
           if [ ! -f debug.keystore ]; then
             if [ -f debug.keystore.base64 ]; then
@@ -110,6 +111,13 @@ jobs:
           fi
           if [ ! -f .env ] && [ -f .env.example ]; then
             cp .env.example .env
+          fi
+          if [ ! -f app/src/main/res/values/firebase_applet_config.xml ]; then
+            mkdir -p app/src/main/res/values
+            printf '<?xml version="1.0" encoding="utf-8" standalone="no"?>\n<resources>\n    <string name="firestore_database_id" translatable="false">ai-studio-android-aurapuls-c9586a34-dab8-4459-bb80-41ea50593ca8</string>\n</resources>\n' > app/src/main/res/values/firebase_applet_config.xml
+          fi
+          if [ ! -f app/google-services.json ]; then
+            printf '{\n  "project_info": {\n    "project_number": "123456789000",\n    "project_id": "demo-no-project",\n    "storage_bucket": "demo-no-project.appspot.com"\n  },\n  "client": [\n    {\n      "client_info": {\n        "mobilesdk_app_id": "1:123456789000:android:abcdef1234567890",\n        "android_client_info": {\n          "package_name": "com.aistudio.aurapulse.kxmpzq"\n        }\n      },\n      "oauth_client": [\n        {\n          "client_id": "123456789000-ciwebclient.apps.googleusercontent.com",\n          "client_type": 3\n        }\n      ],\n      "api_key": [\n        {\n          "current_key": "AIzaSyDummyKeyForCiBuildAndEmulatorTesting00"\n        }\n      ],\n      "services": {\n        "appinvite_service": {\n          "other_platform_oauth_client": [\n            {\n              "client_id": "123456789000-ciwebclient.apps.googleusercontent.com",\n              "client_type": 3\n            }\n          ]\n        }\n      }\n    }\n  ],\n  "configuration_version": "1"\n}\n' > app/google-services.json
           fi
 
       - name: Ensure Gradle Wrapper Executable Permission
