@@ -47,7 +47,7 @@ jobs:
           test -f firestore.rules
 
       - name: Set up Java ${{ env.JAVA_VERSION }} (for Firebase Firestore Emulator)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
@@ -76,7 +76,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK ${{ env.JAVA_VERSION }} (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
