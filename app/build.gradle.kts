@@ -1,5 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.time.Duration
+import java.util.Base64
 
 plugins {
   alias(libs.plugins.android.application)
@@ -89,6 +90,20 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
+// A developer-supplied google-services.json always wins. The repository's existing
+// AI Studio configuration is only used when no local configuration was supplied.
+val prepareGoogleServices = tasks.register("prepareGoogleServices") {
+  val localConfig = layout.projectDirectory.file("google-services.json").asFile
+  val bundledConfig = layout.projectDirectory.file("google-services.base64").asFile
+  doLast {
+    if (!localConfig.exists() && bundledConfig.exists()) {
+      localConfig.writeBytes(Base64.getMimeDecoder().decode(bundledConfig.readText()))
+    }
+  }
+}
+tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServices") }
+  .configureEach { dependsOn(prepareGoogleServices) }
+
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
@@ -96,6 +111,12 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.media3.exoplayer)
+  implementation(libs.androidx.media3.hls)
+  implementation(libs.androidx.media3.session)
+  implementation(libs.androidx.documentfile)
+  implementation(libs.coil.compose)
+  implementation(libs.kotlinx.coroutines.play.services)
   // implementation(libs.androidx.camera.camera2)
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)
@@ -144,6 +165,7 @@ dependencies {
   androidTestImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.espresso.core)
+  androidTestImplementation(libs.androidx.core)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)

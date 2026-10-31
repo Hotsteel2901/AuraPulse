@@ -2,7 +2,7 @@
   "entities": {
     "Playlist": {
       "title": "Playlist",
-      "description": "Custom audiophile playlist synced across devices and custom music API sources.",
+      "description": "Legacy schema; the current app does not use this collection. Custom audiophile playlist synced across devices and custom music API sources.",
       "type": "object",
       "properties": {
         "userId": {
@@ -23,12 +23,18 @@
         },
         "sourceService": {
           "type": "string",
-          "enum": ["AURA_HIFI", "CUSTOM_API", "SUBSONIC", "OPEN_GLOBAL", "HYBRID"],
+          "enum": [
+            "AURA_HIFI",
+            "CUSTOM_API",
+            "SUBSONIC",
+            "OPEN_GLOBAL",
+            "HYBRID"
+          ],
           "description": "Primary custom music API source or hybrid provider."
         },
         "isOfflinePinned": {
           "type": "boolean",
-          "description": "Whether the playlist tracks are pinned for offline FLAC/WAV storage."
+          "description": "Legacy metadata flag only; it does not prove that audio files were downloaded."
         },
         "trackIds": {
           "type": "array",
@@ -59,7 +65,7 @@
     },
     "CustomMusicSource": {
       "title": "CustomMusicSource",
-      "description": "User-defined custom or open music API endpoint supporting all countries and regions.",
+      "description": "Legacy schema; the current app does not use this collection. User-defined custom or open music API endpoint supporting all countries and regions.",
       "type": "object",
       "properties": {
         "userId": {
@@ -137,7 +143,7 @@
     },
     "SoundProfile": {
       "title": "SoundProfile",
-      "description": "Personalized 10-band parametric equalizer and audiophile DSP profile.",
+      "description": "Legacy schema; the current app does not use this collection. Personalized 10-band parametric equalizer and audiophile DSP profile.",
       "type": "object",
       "properties": {
         "userId": {
@@ -150,7 +156,14 @@
         },
         "presetCategory": {
           "type": "string",
-          "enum": ["FLAT_STUDIO", "WARM_TUBE", "BASS_SURGE", "VOCAL_CLARITY", "HARMAN_TARGET", "CUSTOM"],
+          "enum": [
+            "FLAT_STUDIO",
+            "WARM_TUBE",
+            "BASS_SURGE",
+            "VOCAL_CLARITY",
+            "HARMAN_TARGET",
+            "CUSTOM"
+          ],
           "description": "Acoustic target curve category."
         },
         "bandsDb": {
@@ -171,7 +184,7 @@
         },
         "dacBitPerfectMode": {
           "type": "boolean",
-          "description": "Whether USB/Internal Hi-Res DAC bit-perfect bypass is enabled."
+          "description": "Legacy metadata flag only; the current app does not claim or perform bit-perfect output."
         },
         "isActive": {
           "type": "boolean",
@@ -204,7 +217,7 @@
     },
     "SyncState": {
       "title": "SyncState",
-      "description": "Cross-platform playback handoff and active custom music API status.",
+      "description": "Legacy schema; the current app does not use this collection. Cross-platform playback handoff and active custom music API status.",
       "type": "object",
       "properties": {
         "userId": {
@@ -229,7 +242,12 @@
         },
         "activeService": {
           "type": "string",
-          "enum": ["AURA_HIFI", "CUSTOM_API", "SUBSONIC", "OPEN_GLOBAL"],
+          "enum": [
+            "AURA_HIFI",
+            "CUSTOM_API",
+            "SUBSONIC",
+            "OPEN_GLOBAL"
+          ],
           "description": "Active streaming engine."
         },
         "audioQualityBadge": {
@@ -268,6 +286,36 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "LibraryBackup": {
+      "title": "LibraryBackup",
+      "description": "Explicit user-owned snapshot at users/{uid}/backups/library. Contains playlists and online audio metadata, not local files or document grants.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        },
+        "data": {
+          "type": "string",
+          "maxLength": 700000
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "schemaVersion",
+        "data",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -275,25 +323,32 @@
       "schema": {
         "$ref": "#/entities/Playlist"
       },
-      "description": "User custom playlists synced across devices and custom music APIs."
+      "description": "Legacy collection; not used by the current app. User custom playlists synced across devices and custom music APIs."
     },
     "/users/{userId}/customSources/{sourceId}": {
       "schema": {
         "$ref": "#/entities/CustomMusicSource"
       },
-      "description": "User-defined custom music APIs with multi-country/region support."
+      "description": "Legacy collection; not used by the current app. User-defined custom music APIs with multi-country/region support."
     },
     "/users/{userId}/soundProfiles/{profileId}": {
       "schema": {
         "$ref": "#/entities/SoundProfile"
       },
-      "description": "User personalized 10-band equalizer and audiophile DSP presets."
+      "description": "Legacy collection; not used by the current app. User personalized 10-band equalizer and audiophile DSP presets."
     },
     "/users/{userId}/syncState/{deviceId}": {
       "schema": {
         "$ref": "#/entities/SyncState"
       },
-      "description": "Cross-platform playback state and active custom music API info."
+      "description": "Legacy collection; not used by the current app. Cross-platform playback state and active custom music API info."
+    },
+    "/users/{userId}/backups/library": {
+      "schema": {
+        "$ref": "#/entities/LibraryBackup"
+      },
+      "description": "Current app: one explicit user-owned backup of playlists and online links."
     }
-  }
+  },
+  "description": "Legacy collection schemas remain for compatibility and are not used by the current app. The current app uses the LibraryBackup document."
 }

@@ -27,7 +27,7 @@ concurrency:
 
 env:
   JAVA_VERSION: '21'
-  NODE_VERSION: '22'
+  NODE_VERSION: '24'
   GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=4 -Djava.awt.headless=true -Xmx4g'
   JAVA_TOOL_OPTIONS: '-Djava.awt.headless=true'
 
@@ -39,6 +39,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Verify translations
+        run: python3 tools/check_locales.py
 
       - name: Verify AGPL-3.0-or-later License & Metadata
         run: |
@@ -58,10 +61,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install Latest Firebase Emulator CLI & Rules Unit Testing SDK
+      - name: Install Pinned Firebase Emulator CLI & Rules Unit Testing SDK
         run: |
-          npm install -g firebase-tools@latest
-          npm install --no-save @firebase/rules-unit-testing@latest firebase@latest
+          npm install -g firebase-tools@15.34.2
+          npm install --no-save --no-package-lock @firebase/rules-unit-testing@6.0.0 firebase@13.1.0
 
       - name: Execute Tier 1 Firestore Security Rules Suite
         run: |
@@ -140,7 +143,7 @@ jobs:
 
       - name: Start Firebase Emulators & Run Unit + Robolectric Tests
         run: |
-          npm install -g firebase-tools@latest
+          npm install -g firebase-tools@15.34.2
           (setsid nohup firebase emulators:start --only firestore,auth --project demo-no-project > /tmp/firebase-emulators.log 2>&1 < /dev/null &)
           for i in $(seq 1 90); do
             if curl -s -o /dev/null http://127.0.0.1:8085 && curl -s -o /dev/null http://127.0.0.1:9099; then

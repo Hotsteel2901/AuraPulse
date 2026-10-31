@@ -89,6 +89,18 @@ service cloud.firestore {
 
     // 4. Scoped User Collections
     match /users/{userId} {
+      // One explicit, user-owned library backup. Audio files and document grants are not uploaded.
+      match /backups/{backupId} {
+        allow get: if isSignedIn() && request.auth.uid == userId && backupId == 'library';
+        allow list: if false;
+        allow create, update: if isSignedIn() && request.auth.uid == userId && backupId == 'library' &&
+          incoming().keys().hasOnly(['userId', 'schemaVersion', 'data', 'updatedAt']) &&
+          incoming().keys().hasAll(['userId', 'schemaVersion', 'data', 'updatedAt']) &&
+          incoming().userId == request.auth.uid && incoming().schemaVersion == 1 &&
+          incoming().data is string && incoming().data.size() <= 700000 &&
+          incoming().updatedAt == request.time;
+        allow delete: if isSignedIn() && request.auth.uid == userId && backupId == 'library';
+      }
       match /playlists/{playlistId} {
         allow get: if isSignedIn() && isValidId(userId) && isValidId(playlistId) &&
                       request.auth.uid == userId && existing().userId == request.auth.uid;

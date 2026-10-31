@@ -1,166 +1,95 @@
-<div align="center">
+# AuraPulse
 
-# 🎛️ AuraPulse
+An Android music player for **your own audio files, playlists and honest online sources**. Local playback does not require an account. The app is licensed under [AGPL-3.0-or-later](LICENSE).
 
-### **Material Design 3 Expressive 24-Bit / 192kHz Lossless Music Player & Universal Custom Music API Client**
-**24-Bit / 192kHz 无损高保真灵动播放器 · 全球全区域通用自定义音源客户端**
-**24-Bit / 192kHz 無損高傳真靈動播放器 · 全球全區域通用自訂音源用戶端**
-
-[![CI Status](https://img.shields.io/badge/GitHub_Actions_CI-Passing-00F5D4?style=for-the-badge&logo=githubactions&logoColor=080A0F)](./.github/workflows/android-ci.yml)
-[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-10B981?style=for-the-badge&logo=gnu&logoColor=white)](./LICENSE)
-[![Developer](https://img.shields.io/badge/Developer-github%40Hotsteel2901-9B5DE5?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hotsteel2901)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-FF9F1C?style=for-the-badge&logo=kotlin&logoColor=white)](./gradle/libs.versions.toml)
-[![Android SDK](https://img.shields.io/badge/Android_API-36_(Min_24)-3B82F6?style=for-the-badge&logo=android&logoColor=white)](./app/build.gradle.kts)
-
-[**English**](#-overview) · [**简体中文**](#-项目概览-简体中文) · [**繁體中文**](#-專案概覽-繁體中文) · [**Architecture**](#-system-architecture--dsp-pipeline) · [**CI/CD**](#-automated-ci--component-matrix) · [**Developer**](#-about-the-developer-githubhotsteel2901)
-
-</div>
+[简体中文](#简体中文) · [English](#english)
 
 ---
 
-## 🌌 Overview
+## 简体中文
 
-**AuraPulse** is a free, libre, and borderless audiophile music player for Android engineered with **Jetpack Compose** and **Material Design 3 Expressive** principles. Designed and built by **[Hotsteel2901 (`github@Hotsteel2901`)](https://github.com/Hotsteel2901)** under the **GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`)**, AuraPulse rejects proprietary platform lock-in in favor of an open, user-extensible **Universal Custom Music Source API** engine that supports listeners across every country and region worldwide.
+### 现在可以做什么
 
-### ✨ Core Highlights
+- **播放本地音频**：在“资料库”选择文件或文件夹。应用使用 Android 系统文件选择器，并保存可持续读取的授权；不会移动或删除原文件。支持格式取决于 Android / 设备的解码能力。文件被移动、删除或授权撤销后，需要重新选择。
+- **真实播放与后台控制**：使用 Android Media3 / ExoPlayer 读取实际音频或流，支持播放、暂停、进度拖动、上一首/下一首、随机和循环，并提供系统媒体通知与音频焦点处理。直播流通常不能拖动进度。
+- **真实在线来源**：iTunes Search 返回的是**短试听片段，不是完整歌曲**；Radio Browser 提供直播电台，电台能否播放取决于该电台和网络。也可添加直接音频链接，或配置一个返回音频 URL 的通用 JSON 搜索 API。应用不再内置虚构歌曲，也不宣称支持尚未实现的 Subsonic、Jellyfin 或 Internet Archive 协议。
+- **离线与歌单**：本地文件本身不需要重新下载；用户添加的直接链接或自定义 API 音频可手动下载到应用私有目录，完整接收后才标记为已下载（上限 512 MiB；直播、试听和 HLS/DASH 等分段播放清单不提供离线下载）。歌单和资料库保存在设备上，重启后仍在。
+- **设备均衡器**：只显示当前 Android 音频会话实际支持的频段。设备不支持时会明确提示；不再宣称固定采样率、无损位深、Bit-Perfect 或虚构的 DSP 效果。
+- **云端备份**：Google 登录后可手动备份/恢复歌单和在线音频链接。恢复会合并本地数据；同一歌单按设备记录的修改时间保留较新版本。**音频文件、下载副本与 Android 文件读取授权不会上传**；其他设备上的本地文件需重新导入并重新加入歌单。备份是手动快照，不是实时同步。上传会覆盖该账号上一次快照，并在操作前确认。
+- **语言**：简体中文、繁體中文、English、日本語、한국어、Español、Deutsch，以及跟随系统。香港系统语言使用繁体中文资源。
 
-- **🎧 24-Bit / 192kHz Studio Master Playback Engine**:
-  - Hardware-accelerated stereo PCM synthesis and `AudioTrack` output pipeline with selectable target sample rates (`44.1 kHz Redbook`, `96.0 kHz Studio`, `192.0 kHz Master`, `384.0 kHz DXD`) and configurable low-latency buffers (`64ms`, `128ms`, `256ms`).
-  - **USB / Internal Hi-Res DAC Bit-Perfect Mode** bypassing software DSP stages for direct 1:1 PCM delivery.
-  - **Real-Time 28-Band FFT Spectrum & RMS Telemetry** paired with a 60fps rotating vinyl master platter.
-- **🎚️ 10-Band Parametric Equalizer & Spatial DSP**:
-  - Precision 64-bit floating-point cascaded biquad octave filters (`31Hz` to `16kHz`, `-12.0 dB` to `+12.0 dB`) with real-time Catmull-Rom spline frequency response visualization.
-  - Pre-amplifier headroom gain, Sub-Bass Harmonic Exciter, Holographic Crossfeed Spatializer, **ReplayGain (-14 LUFS)** loudness normalization, and built-in audiophile curves (*Harman Reference*, *Flat Studio Monitor*, *Warm Tube Triode*, *Sub-Bass Surge*, *Vocal Presence*).
-- **🌍 Universal Custom Music Source APIs (All Countries & Regions)**:
-  - Self-add your own or known music APIs with custom base URLs, search paths, optional HTTP authentication headers (`Authorization`, `X-Api-Token`), and preferred lossless codecs.
-  - **5 Built-In Protocol Adapters**:
-    1. `OPEN_REST_JSON` — Universal REST JSON track/stream array parser
-    2. `SUBSONIC_NAVIDROME` — OpenSubsonic / Navidrome / Airsonic self-hosted servers
-    3. `RADIO_BROWSER_GLOBAL` — Global community lossless & high-bitrate radio directory
-    4. `ARCHIVE_LOSSLESS` — Internet Archive 24-bit/16-bit FLAC concert & audio vault
-    5. `JELLYFIN_AUDIO` — Jellyfin & Emby media server audio endpoints
-  - **Worldwide ISO Country/Area Router**: Instant switching across 24+ preset regions (`GLOBAL`, `US`, `JP`, `KR`, `TW`, `HK`, `SG`, `DE`, `GB`, `FR`, `CA`, `AU`, `BR`, `IN`, etc.) plus arbitrary custom ISO 3166-1 country codes (`CN`, `NZ`, `AR`, `CH`, `AE`, `ZA`, etc.).
-  - **Live Endpoint Ping & Diagnostics**: One-tap HTTP status, latency (`ms`), and payload verification.
-- **💾 Offline Hi-Res FLAC Vault & Cloud Sync**:
-  - Pin individual tracks or entire custom playlists to the device-local **Room SQLite + Stereo PCM Vault** for zero-buffering offline playback.
-  - Real-time multi-device synchronization of custom playlists, custom API sources, 10-band EQ sound profiles, and cross-platform playback handoff via **Firebase Firestore** and **Google Sign-In (`CredentialManager`)**.
-- **🌐 Instant Multi-Language Localization**:
-  - Zero-restart reactive localization supporting **Simplified Chinese (`简体中文`)**, **Traditional Chinese (`繁體中文 - 台灣 / 香港`)**, **English**, **Japanese (`日本語`)**, **Korean (`한국어`)**, **Spanish (`Español`)**, and **German (`Deutsch`)**.
+应用允许播放 `http://` 电台和用户自行添加的直链，因为一些电台没有 HTTPS；这些连接未加密。通用搜索 API 必须使用 HTTPS，且不支持在 URL 内嵌用户名和密码。不要把令牌放在 URL 查询参数中：**云备份会包含在线链接**。搜索 API 配置仅保存在本机，当前不支持自定义认证头。网络服务可能限制地区、下线或改变接口，失败会显示错误，而不会伪造播放结果。
 
----
+### Google 登录与云端配置
 
-## 🇨🇳 项目概览 (简体中文)
+Google 登录无法通过代码绕过 Firebase 配置或 APK 签名验证。仓库包含原项目的 `app/google-services.base64`；构建时若没有本地 `app/google-services.json` 会自动解码它，但**这不保证你自己的签名、Google 登录方式或数据库已配置好**。如果使用自己的 Firebase 项目：
 
-**AuraPulse** 是一款基于 **Jetpack Compose** 与 **Material Design 3 Expressive（灵动设计）** 打造的发烧级开源无损音乐播放器，由 **[Hotsteel2901 (`github@Hotsteel2901`)](https://github.com/Hotsteel2901)** 独立设计与研发，遵循 **AGPL-3.0-or-later** 自由软件许可协议发布。
+1. 在 Firebase 控制台添加 Android 应用，包名必须与 `app/build.gradle.kts` 中的 `applicationId` 一致（当前为 `com.aistudio.aurapulse.kxmpzq`）。下载该项目生成的 `google-services.json`，放到 `app/` 下；本地文件优先于仓库中的 base64 配置，不会被 Git 跟踪。
+2. 在 Firebase Authentication 中启用 **Google** 登录。确认生成的配置含有类型为 3 的 Web OAuth client；如 OAuth 同意屏幕处于测试状态，添加测试账号。设备需要可用的 Google Play 服务及网络。
+3. 将**实际用于安装 APK 的签名证书 SHA-1 / SHA-256** 加入 Firebase Android 应用设置。Debug、自己签名的 release、Google Play 应用签名可能各不相同，都应登记。修改后重新下载 `google-services.json`。当前项目的 debug 签名文件为仓库根目录的 `debug.keystore`：
 
-### 核心特性
-1. **全球无国界通用自定义音源 API 引擎**：
-   - 彻底摆脱商业流媒体平台限制，支持用户自由添加个人或公开的音乐 API（支持 **通用 REST JSON**、**OpenSubsonic / Navidrome**、**全球 Radio-Browser**、**Internet Archive 无损音乐库** 以及 **Jellyfin / Emby**）。
-   - 内置覆盖全球所有国家与地区的 **ISO 国际区域路由器**（预设 `GLOBAL`、`CN`、`TW`、`HK`、`JP`、`KR`、`SG`、`US`、`DE`、`GB` 等，并支持任意自定义 ISO 国家代码）与一键 **Ping 测速诊断**。
-2. **24-Bit / 192kHz 母带唱机与 10 段参量均衡器**：
-   - 支持 USB / 内置高清 DAC **Bit-Perfect 源码直通模式**、前级动态余量增益、超低频偶次谐波激励器、全息声场互馈（Crossfeed）及 **ReplayGain -14 LUFS** 响度标准化。
-   - 配备实时 **28 频段 FFT 频谱仪**、**64 位浮点双二阶滤波器频响样条曲线**以及云端音效配置同步。
-3. **离线无损 FLAC 金库与跨平台无缝接力**：
-   - 支持将自定义歌单与无损曲目一键缓存至本地离线金库，并通过 Google 账号与 Firestore 实时同步歌单、自定义音源、EQ 曲线与多设备播放进度。
-4. **多语言零延迟切换与系统配置中心**：
-   - 内置完整的 **简体中文**、**繁體中文**、**English**、**日本語**、**한국어** 等多国语言包，支持在顶栏或设置页即时无感切换。
+   ```bash
+   # 若尚无该文件，先创建一个本机 debug 签名（不要用于正式发布）
+   keytool -genkeypair -keystore debug.keystore -storepass android \
+     -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+     -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+   keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android
+   ```
 
----
+4. 创建 Firestore 数据库并部署本仓库的 `firestore.rules`。应用从 `app/src/main/res/values/firebase_applet_config.xml` 的 `firestore_database_id` 读取数据库 ID；仓库原配置为一个**命名数据库**。若使用自己的 `(default)` 数据库，请同时修改该资源和 `firebase.json` 中的 Firestore 数据库配置，再部署：
 
-## 🇹🇼 專案概覽 (繁體中文)
+   ```bash
+   firebase deploy --only firestore:rules --project YOUR_PROJECT_ID
+   ```
 
-**AuraPulse** 是一款採用 **Jetpack Compose** 與 **Material Design 3 Expressive（靈動設計）** 打造的發燒級開源無損音樂播放器，由 **[Hotsteel2901 (`github@Hotsteel2901`)](https://github.com/Hotsteel2901)** 獨立設計與研發，依據 **AGPL-3.0-or-later** 自由軟體授權條款釋出。
+5. 在应用“设置 → 账号与云端”登录。只有 Firebase 真正接受 Google 凭据时才显示登录成功；网络、OAuth、签名或规则错误会显示出来。备份在服务器确认写入后才报告成功；超时的排队写入有可能稍后完成，应先检查再重试。
 
-### 核心亮點
-1. **全球無國界通用自訂音源 API 引擎**：
-   - 擺脫商業串流平台綁定，支援使用者自行新增個人或已知的開放音樂 API（涵蓋 **通用 REST JSON**、**OpenSubsonic / Navidrome**、**全球 Radio-Browser**、**Internet Archive 無損音樂庫** 與 **Jellyfin / Emby**）。
-   - 內建支援全球所有國家與地區的 **ISO 區域智慧路由**（支援 `GLOBAL`、`TW`、`HK`、`JP`、`KR`、`SG`、`US`、`DE`、`GB` 等及任意自訂 ISO 代碼）與一鍵 **連線延遲診斷**。
-2. **24-Bit / 192kHz 母帶唱機與 10 段參數等化器**：
-   - 支援 USB / 內建高解析 DAC **Bit-Perfect 位元直通模式**、前級動態餘裕增益、極低頻諧波激勵器、全息音場互饋（Crossfeed）與 **ReplayGain -14 LUFS** 響度標準化。
-3. **離線無損 FLAC 金庫與跨裝置無縫接力**：
-   - 支援將自訂播放清單與曲目一鍵釘選至本機離線金庫，並透過 Google 登入與 Firestore 即時同步播放清單、自訂音源、EQ 設定與跨裝置播放狀態。
+新版本使用私有路径 `users/{uid}/backups/library`；规则限制只有该用户可读写。单个备份最多 700,000 字节，支持最多 2,000 个在线条目、200 个歌单、每歌单 1,000 个引用。旧版本的数据库和 Firestore 旧集合不会被删除，但其虚构曲目和旧云端条目**不会自动迁移**；请重新添加真实文件及音源后创建新备份。
 
----
+### 构建和测试
 
-## 🏗️ System Architecture & DSP Pipeline
-
-```text
-┌────────────────────────────────────────────────────────────────────────────┐
-│                        AuraPulse M3 Expressive UI                          │
-│  HiFiDeckScreen │ PlaylistsScreen │ EqualizerScreen │ CloudOffline │ Config│
-│               Reactive Multi-Language Engine (LocalAuraStrings)            │
-└───────────────┬───────────────────────────┬────────────────────────┬───────┘
-                │                           │                        │
-                ▼                           ▼                        ▼
-┌──────────────────────────────┐ ┌─────────────────────┐ ┌───────────────────┐
-│      HiFiAudioEngine         │ │ CustomSourceBridge  │ │ AuraFirestoreRepo │
-│ • 24-Bit/192kHz PCM Synth    │ │ • OPEN_REST_JSON    │ │ • /playlists      │
-│ • 10-Band Biquad Filter DSP  │ │ • SUBSONIC_NAVIDROME│ │ • /customSources  │
-│ • Hardware Equalizer AudioFX │ │ • RADIO_BROWSER     │ │ • /soundProfiles  │
-│ • 28-Bin Real-Time FFT       │ │ • ARCHIVE_LOSSLESS  │ │ • /syncState      │
-└───────────────┬──────────────┘ └──────────┬──────────┘ └─────────┬─────────┘
-                │                           │                      │
-                ▼                           ▼                      ▼
-┌──────────────────────────────────────────────────────┐ ┌───────────────────┐
-│         OfflineVaultDatabase (Room SQLite)           │ │ Firebase Firestore│
-│       + Local Stereo Lossless WAV/FLAC Storage       │ │ + Zero-Trust Rules│
-└──────────────────────────────────────────────────────┘ └───────────────────┘
-```
-
----
-
-## ⚙️ Automated CI & Component Matrix
-
-AuraPulse enforces strict build reproducibility, security rule auditing, and automated dependency freshness via **GitHub Actions** (`.github/workflows/android-ci.yml`) and **Dependabot v2** (`.github/dependabot.yml`).
-
-| Component / Toolchain | Version | Role |
-| :--- | :--- | :--- |
-| **Android Gradle Plugin (AGP)** | `9.1.1` | Official Android build system with built-in Kotlin support |
-| **Gradle Wrapper Distribution** | `9.3.1` | Build orchestration & configuration cache |
-| **Kotlin & Compose Compiler** | `2.2.10` | Language runtime & Jetpack Compose compiler plugin |
-| **Google DevTools KSP** | `2.3.5` | Kotlin Symbol Processing for Room SQLite codegen |
-| **Compile / Target / Min SDK** | `36` / `36` / `24` | Android 16 (API 36) target with wide device compatibility |
-| **Firebase BoM** | `34.17.0` | Firestore & Firebase Auth version alignment |
-| **AndroidX Room** | `2.7.0` | Local offline track catalog & vault persistence |
-| **Jetpack Credential Manager** | `1.5.0` | Google Sign-In (`GetSignInWithGoogleOption`) authentication |
-| **Robolectric** | `4.16.1` | Local JVM & emulator-backed Firestore rules verification |
-| **GitHub Actions Runner Stack** | `v4` (`JDK 21` / `Node 22`) | Automated license check, rules tests, APK build & test reports |
-
-### Running Local Verification Commands
+需要 JDK 21、Android SDK（API 36.1）和网络访问 Google Maven / Maven Central。首次构建需准备上述 `debug.keystore`，并按需配置 Firebase。仓库提供 Gradle 9.3.1 wrapper：
 
 ```bash
-# 1. Run Tier 1 Firestore Security Rules Unit Tests (Node.js + Firestore Emulator)
+./gradlew :app:assembleDebug
+python3 tools/check_locales.py
+# Android JVM / Robolectric 测试；完整套件还需要 Firebase Auth + Firestore 模拟器
+./gradlew :app:testDebugUnitTest
+# 在连接的 Android 设备或模拟器上测试实际音频服务
+./gradlew :app:connectedDebugAndroidTest
+```
+
+Firestore 规则测试（Node.js 24.12+、Firebase CLI 15.34.2）：
+
+```bash
+npm install --no-save --no-package-lock @firebase/rules-unit-testing@6.0.0 firebase@13.1.0
 firebase emulators:exec --only firestore --project demo-no-project "node --test firestore.test.js"
-
-# 2. Run Tier 2 Kotlin Robolectric & Repository Rule Tests
-gradle :app:testDebugUnitTest
-
-# 3. Assemble Debug APK
-gradle :app:assembleDebug
 ```
 
 ---
 
-## 👨‍💻 About the Developer (`github@Hotsteel2901`)
+## English
 
-<div align="center">
+### What works
 
-| **Developer** | **GitHub Handle** | **Focus Areas** | **License Philosophy** |
-| :---: | :---: | :---: | :---: |
-| **Hotsteel2901** | [**`github@Hotsteel2901`**](https://github.com/Hotsteel2901) | High-Fidelity Audio DSP · Material Design 3 Expressive · Decentralized Open Music APIs | **AGPL-3.0-or-later** Free & Libre Copyleft |
+- Import files or folders through Android’s Storage Access Framework with persisted read permissions. Original files are never moved or deleted. Format support depends on the device.
+- Media3 / ExoPlayer plays the actual file or stream, with background media controls, seeking where supported, audio focus, shuffle and repeat.
+- iTunes Search provides **previews only**; Radio Browser provides live stations. Add a direct audio URL or an HTTPS JSON API returning `title` and `streamUrl` in an array or a `results`, `tracks`, `items` or `data` array. There are no fabricated tracks or unimplemented protocol claims.
+- Playlists persist locally. Explicit downloads are available for direct/custom audio URLs, not previews, live radio or segmented HLS/DASH playlists; a file is marked downloaded only after it has been fully received (512 MiB limit).
+- The equalizer exposes only the bands actually supported by the Android audio session. No bit-perfect or fixed sample-rate claim is made.
+- Google/Firebase provides an **explicit, manual** backup of playlists and online links. Audio files, downloaded copies and Android document permissions are not uploaded. Restore merges rather than deleting local items; local files must be imported and added to playlists again on another device.
+- Complete interface resources are supplied for English, Simplified and Traditional Chinese, Japanese, Korean, Spanish and German. Other system languages fall back to English.
 
-</div>
+HTTP streams are allowed for compatibility with radio stations and are not encrypted. Custom JSON search endpoints must use HTTPS. Configuration stays on the device, but backed-up online URLs may contain sensitive query parameters; do not place credentials in them.
 
-- **GitHub Profile**: [https://github.com/Hotsteel2901](https://github.com/Hotsteel2901) (`github@Hotsteel2901`)
-- **In-App Interactive Showcase**: Open the **Config & About (设置与关于 / 設定與關於)** tab inside AuraPulse to interact with the real-time **Holo-Resonance Orbital Matrix Canvas**, inspect the engineering telemetry radar, and send harmonic star pulses.
+### Firebase setup
 
----
+A working Google sign-in requires an actual Firebase project, enabled Google provider, web OAuth client ID, Google Play services, and SHA-1/SHA-256 fingerprints for **every APK signing key**, including Play App Signing where applicable. Put your project’s `google-services.json` in `app/`; it takes precedence over the existing base64 configuration. The application ID must match the Firebase Android app. See the detailed setup steps and debug keystore commands in the Chinese section above.
 
-## 📜 License (`AGPL-3.0-or-later`)
+Create the Firestore database, set `firestore_database_id` in `app/src/main/res/values/firebase_applet_config.xml`, update `firebase.json` to target the same database, and deploy `firestore.rules`. Backups live at `users/{uid}/backups/library` and are owner-only. Backup is limited to 700,000 bytes, 2,000 online tracks, 200 playlists and 1,000 references per playlist. A server acknowledgement is required for a success message. A timed-out queued write might still complete later.
 
-```text
-Copyright (C) 2026 Hotsteel2901 (github@Hotsteel2901 / https://github.com/Hotsteel2901)
-SPDX-License-Identifier: AGPL-3.0-or-later
-```
+The old app’s database and Firestore collections are left untouched, but synthetic tracks and old cloud collections are not automatically imported. Re-add real files and sources before making a new backup.
 
-This program is free software: you can redistribute it and/or modify it under the terms of the **GNU Affero General Public License** as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (**`AGPL-3.0-or-later`**). See the [LICENSE](./LICENSE) file for the full text.
+### Build and test
+
+Use JDK 21, Android SDK API 36.1, the included Gradle wrapper and access to Google Maven / Maven Central. Create `debug.keystore` as shown above, then run `./gradlew :app:assembleDebug`, `python3 tools/check_locales.py`, and `./gradlew :app:testDebugUnitTest`. The full JVM suite requires the Firebase Auth and Firestore emulators. Run `./gradlew :app:connectedDebugAndroidTest` on a device or emulator for the real media-service playback test.

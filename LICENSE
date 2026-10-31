@@ -29,9 +29,8 @@ connected client-server applications.
 
   1. Freedom to Run: You are free to run AuraPulse for any purpose, across
      any country or region worldwide.
-  2. Freedom to Study & Modify: You have the right to inspect the audio DSP
-     pipeline, 10-band parametric biquad filters, and Universal Custom Music
-     Source API adapters, and adapt them to your needs.
+  2. Freedom to Study & Modify: You have the right to inspect and adapt the
+     application's source code to your needs.
   3. Network Interaction & Source Availability (Section 13): If you modify
      this program and let users interact with it remotely through a computer
      network, your modified version must prominently offer all users

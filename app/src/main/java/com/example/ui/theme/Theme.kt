@@ -1,98 +1,38 @@
 package com.example.ui.theme
 
-import android.os.Build
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-val ExpressiveShapes =
-  Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(22.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp),
-  )
+private val AuraColors = darkColorScheme(
+  primary = Color(0xFFC4E9AE), onPrimary = Color(0xFF18331E),
+  primaryContainer = Color(0xFF304A36), onPrimaryContainer = Color(0xFFE1F7D2),
+  secondary = Color(0xFFB8D3C0), onSecondary = Color(0xFF24372B),
+  secondaryContainer = Color(0xFF34483C), onSecondaryContainer = Color(0xFFD4E8D6),
+  tertiary = Color(0xFFF0C898), onTertiary = Color(0xFF483119),
+  background = Color(0xFF0F1512), onBackground = Color(0xFFF0F3E9),
+  surface = Color(0xFF151D18), onSurface = Color(0xFFF0F3E9),
+  surfaceVariant = Color(0xFF29362D), onSurfaceVariant = Color(0xFFBFCBBF),
+  outline = Color(0xFF788B7A), outlineVariant = Color(0xFF36463B),
+  error = Color(0xFFFFB4AB),
+)
 
 @Composable
-fun AuraPulseTheme(
-  accentHex: String = "#00F5D4",
-  secondaryHex: String = "#7B2CBF",
-  useSystemDynamicWallpaper: Boolean = false,
-  content: @Composable () -> Unit,
-) {
-  val context = LocalContext.current
-  val targetPrimary = parseHexColor(accentHex, ElectricCyan)
-  val targetSecondary = parseHexColor(secondaryHex, NeonViolet)
-
-  val animatedPrimary by
-    animateColorAsState(
-      targetValue = targetPrimary,
-      animationSpec = spring(stiffness = Spring.StiffnessLow),
-      label = "dynamicPrimary",
-    )
-  val animatedSecondary by
-    animateColorAsState(
-      targetValue = targetSecondary,
-      animationSpec = spring(stiffness = Spring.StiffnessLow),
-      label = "dynamicSecondary",
-    )
-  val animatedSurfaceVariant by
-    animateColorAsState(
-      targetValue = lerp(ObsidianSurfaceVariant, targetPrimary, 0.14f),
-      animationSpec = spring(stiffness = Spring.StiffnessLow),
-      label = "dynamicSurfaceVariant",
-    )
-  val animatedBackground by
-    animateColorAsState(
-      targetValue = lerp(ObsidianBackground, targetPrimary, 0.06f),
-      animationSpec = spring(stiffness = Spring.StiffnessLow),
-      label = "dynamicBackground",
-    )
-
-  val baseScheme =
-    if (useSystemDynamicWallpaper && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      dynamicDarkColorScheme(context)
-    } else {
-      darkColorScheme(
-        primary = animatedPrimary,
-        onPrimary = Color(0xFF041318),
-        primaryContainer = lerp(ObsidianSurfaceHigh, animatedPrimary, 0.28f),
-        onPrimaryContainer = TextPrimary,
-        secondary = animatedSecondary,
-        onSecondary = TextPrimary,
-        secondaryContainer = lerp(ObsidianSurfaceVariant, animatedSecondary, 0.30f),
-        onSecondaryContainer = TextPrimary,
-        tertiary = WarmAmber,
-        background = animatedBackground,
-        onBackground = TextPrimary,
-        surface = ObsidianSurface,
-        onSurface = TextPrimary,
-        surfaceVariant = animatedSurfaceVariant,
-        onSurfaceVariant = TextSecondary,
-      )
-    }
-
+fun AuraPulseTheme(content: @Composable () -> Unit) {
   MaterialTheme(
-    colorScheme = baseScheme,
-    typography = Typography,
-    shapes = ExpressiveShapes,
+    colorScheme = AuraColors,
+    typography = Typography(),
+    shapes = Shapes(
+      extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(12.dp),
+      medium = RoundedCornerShape(18.dp), large = RoundedCornerShape(24.dp),
+      extraLarge = RoundedCornerShape(30.dp),
+    ),
     content = content,
   )
-}
-
-@Composable
-fun MyApplicationTheme(content: @Composable () -> Unit) {
-  AuraPulseTheme(content = content)
 }
