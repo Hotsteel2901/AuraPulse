@@ -142,21 +142,31 @@ jobs:
           fi
 
       - name: Start Firebase Emulators & Run Unit + Robolectric Tests
+        shell: bash
         run: |
+          set -o pipefail
           npm install -g firebase-tools@15.34.2
           (setsid nohup firebase emulators:start --only firestore,auth --project demo-no-project > /tmp/firebase-emulators.log 2>&1 < /dev/null &)
+          ready=false
           for i in $(seq 1 90); do
-            if curl -s -o /dev/null http://127.0.0.1:8085 && curl -s -o /dev/null http://127.0.0.1:9099; then
+            if curl -s --max-time 2 -o /dev/null http://127.0.0.1:8085 && curl -s --max-time 2 -o /dev/null http://127.0.0.1:9099; then
               echo "Firebase Emulators ready after ${i}s"
+              ready=true
               break
             fi
             sleep 1
           done
-          if [ -f ./gradlew ]; then
-            ./gradlew :app:testDebugUnitTest --stacktrace
-          else
-            gradle :app:testDebugUnitTest --stacktrace
+          if [ "$ready" != true ]; then
+            echo "::error::Firebase emulators did not become ready."
+            tail -n 120 /tmp/firebase-emulators.log
+            exit 1
           fi
+          ./gradlew :app:testDebugUnitTest --stacktrace 2>&1 | tee /tmp/aurapulse-unit-tests.log
+
+      - name: Report unit-test failures
+        if: failure()
+        shell: bash
+        run: python3 tools/report_test_failures.py
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
@@ -174,41 +184,3 @@ jobs:
           path: app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 14
-
-  inspect-previous-test-report:
-    name: Inspect previous failed test report
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Download previous report
-        uses: actions/download-artifact@v4
-        with:
-          name: aurapulse-unit-test-reports
-          path: previous-test-report
-          github-token: ${{ github.token }}
-          run-id: 41235027965
-      - name: Surface failure details
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import html, pathlib, re
-          reports = list(pathlib.Path('previous-test-report/classes').glob('*.html'))
-          print('Report files:', len(reports))
-          found = False
-          for path in reports:
-              text = path.read_text(encoding='utf-8')
-              matches = re.findall(r'<h3[^>]*class="failures"[^>]*>(.*?)</h3>.*?<pre[^>]*>(.*?)</pre>', text, re.S)
-              for name, stack in matches:
-                  found = True
-                  detail = html.unescape(re.sub(r'<[^>]+>', '', name + '\n' + stack))[:25000]
-                  escaped = detail.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-                  print(f'::error title=Previous test failure::{escaped}')
-          if not found:
-              for path in pathlib.Path('previous-test-report').rglob('*.html'):
-                  detail = html.unescape(re.sub(r'<[^>]+>', ' ', path.read_text(encoding='utf-8')))
-                  if 'failed' in detail.lower() or 'failure' in detail.lower():
-                      escaped = (str(path) + ' ' + re.sub(r'\s+', ' ', detail))[:25000].replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
-                      print(f'::error title=Previous test report::{escaped}')
-          PY

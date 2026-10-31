@@ -73,8 +73,8 @@ android {
 }
 
 tasks.withType<Test> {
-  failFast = true
-  timeout.set(Duration.ofMinutes(2))
+  failFast = false
+  timeout.set(Duration.ofMinutes(4))
   testLogging {
     events("passed", "failed", "skipped")
   }
