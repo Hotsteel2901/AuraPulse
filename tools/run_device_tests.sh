@@ -13,9 +13,9 @@ result=${PIPESTATUS[0]}
 set -e
 # Collect the synthetic-track player screenshot while the emulator is still running.
 adb pull /sdcard/aurapulse-player.png "$GITHUB_WORKSPACE/device-player.png" || true
-# A manually dispatched, synthetic-only UI inspection run can surface the
-# screenshot in check annotations when artifact downloads are inaccessible.
-if [ "${GITHUB_EVENT_NAME:-}" = workflow_dispatch ] && [ -f "$GITHUB_WORKSPACE/device-player.png" ]; then
+# Synthetic-only UI inspection: surface the test screenshot in annotations
+# when artifact downloads are inaccessible in a restricted environment.
+if [ "${GITHUB_EVENT_NAME:-}" = pull_request ] && [ -f "$GITHUB_WORKSPACE/device-player.png" ]; then
   python3 - <<'PYFRAME'
 import base64
 from pathlib import Path
