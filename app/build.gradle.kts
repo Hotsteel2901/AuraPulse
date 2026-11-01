@@ -145,7 +145,9 @@ listOf("debug", "release").forEach { buildType ->
       )))
     }
   }
-  android.sourceSets.getByName(buildType).assets.srcDir(output)
+  // AGP 9 disallows Provider instances in the legacy source-set API. Use the
+  // directory as a File and explicitly wire the generating task below.
+  android.sourceSets.getByName(buildType).assets.srcDir(output.get().asFile)
   tasks.matching { it.name.startsWith("merge$capitalized") && it.name.endsWith("Assets") }
     .configureEach { dependsOn(generateDiagnostics) }
 }

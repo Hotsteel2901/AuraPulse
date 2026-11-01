@@ -171,7 +171,7 @@ fun NowPlayingScreen(state: PlaybackUiState, vm: MusicViewModel, onDismiss: () -
         MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background,
       ))).safeDrawingPadding(),
     ) {
-      val wide = maxWidth >= 760.dp
+      val wide = maxWidth >= 760.dp || (maxWidth >= 600.dp && maxWidth > maxHeight)
       val artLimit = if (wide) (maxHeight * .72f).coerceIn(170.dp, 410.dp)
         else (maxHeight * .34f).coerceIn(170.dp, 320.dp)
       Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -302,8 +302,8 @@ private fun PlayerControls(
           modifier = Modifier.fillMaxWidth().height(20.dp).clearAndSetSemantics { },
           color = if (state.canSeek) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f),
           trackColor = MaterialTheme.colorScheme.surfaceVariant,
-          amplitude = { if (state.isPlaying && animated) 1f else 0f },
-          waveSpeed = if (state.isPlaying && animated) 20.dp else 0.dp,
+          amplitude = { if (state.durationMs > 0 && state.isPlaying && animated) 1f else 0f },
+          waveSpeed = if (state.durationMs > 0 && state.isPlaying && animated) 20.dp else 0.dp,
         )
       },
     )
