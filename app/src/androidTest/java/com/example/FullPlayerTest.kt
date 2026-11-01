@@ -10,7 +10,10 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
+import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import android.os.ParcelFileDescriptor
 import com.example.data.library.LibraryTrack
 import com.example.data.library.TrackSource
 import com.example.ui.player.MusicViewModel
@@ -41,6 +44,15 @@ class FullPlayerTest {
         compose.runOnUiThread { ready = vm.playerReady }
         ready
       }
+      if (vm.playback.value.shuffle) {
+        compose.runOnUiThread { vm.toggleShuffle() }
+        compose.waitUntil(timeoutMillis = 5_000) { !vm.playback.value.shuffle }
+      }
+      while (vm.playback.value.repeatMode != Player.REPEAT_MODE_OFF) {
+        val previous = vm.playback.value.repeatMode
+        compose.runOnUiThread { vm.cycleRepeat() }
+        compose.waitUntil(timeoutMillis = 5_000) { vm.playback.value.repeatMode != previous }
+      }
       compose.runOnUiThread { vm.play(tracks.first(), tracks) }
       compose.onNodeWithTag("now-playing-screen").assertIsDisplayed()
       val rootSize = compose.onRoot().fetchSemanticsNode().size
@@ -49,6 +61,10 @@ class FullPlayerTest {
       assertEquals("Player should occupy the window height", rootSize.height, playerSize.height)
       compose.onNodeWithText(tracks.first().title).assertIsDisplayed()
       compose.onNodeWithContentDescription(activity.getString(R.string.track_progress)).assertIsDisplayed()
+      // The CI emulator saves a screenshot containing only this synthetic test track.
+      val screenshot = InstrumentationRegistry.getInstrumentation().uiAutomation
+        .executeShellCommand("screencap -p /sdcard/aurapulse-player.png")
+      ParcelFileDescriptor.AutoCloseInputStream(screenshot).use { it.readBytes() }
       compose.onNodeWithContentDescription(activity.getString(R.string.minimize_player)).performClick()
       compose.onNodeWithTag("now-playing-screen").assertDoesNotExist()
       compose.runOnUiThread { vm.next() }
@@ -60,6 +76,12 @@ class FullPlayerTest {
       compose.onNodeWithTag("now-playing-screen").assertDoesNotExist()
       compose.runOnUiThread { vm.play(tracks.first(), tracks) }
       compose.onNodeWithTag("now-playing-screen").assertIsDisplayed()
+      compose.waitUntil(timeoutMillis = 15_000) { vm.playback.value.track?.id == tracks.first().id && vm.playback.value.isPlaying }
+      compose.onNodeWithContentDescription(activity.getString(R.string.minimize_player)).performClick()
+      // Let the real audio reach its end. An automatic media transition must not
+      // pull the listener away from the page they chose after minimizing.
+      compose.waitUntil(timeoutMillis = 20_000) { vm.playback.value.track?.id == tracks.last().id }
+      compose.onNodeWithTag("now-playing-screen").assertDoesNotExist()
     } finally {
       compose.runOnUiThread { if (vm.playback.value.isPlaying) vm.togglePlay() }
       audio.delete()

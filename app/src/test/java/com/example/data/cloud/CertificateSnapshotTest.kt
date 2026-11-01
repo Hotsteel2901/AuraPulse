@@ -11,13 +11,20 @@ class CertificateSnapshotTest {
     assertEquals(CertificateSnapshotStatus.NOT_IN_SNAPSHOT, certificateSnapshotStatus(listOf(installed), listOf(existingConfig)))
   }
 
-  @Test fun acceptsColonOrCaseDifferencesAndAnyCurrentSigner() {
+  @Test fun acceptsColonOrCaseDifferences() {
     assertEquals(CertificateSnapshotStatus.MATCH, certificateSnapshotStatus(listOf(installed), listOf("cb2ab0f4620eb0f187cf3ad4b49cd3c57b330f9d")))
+  }
+
+  @Test fun allCurrentSignersMustAppearInTheSnapshot() {
+    assertEquals(CertificateSnapshotStatus.NOT_IN_SNAPSHOT, certificateSnapshotStatus(
+      listOf(installed, existingConfig), listOf(existingConfig),
+    ))
   }
 
   @Test fun noOrMalformedInformationIsUnknownNotAFalseMismatch() {
     assertEquals(CertificateSnapshotStatus.UNKNOWN, certificateSnapshotStatus(listOf(installed), emptyList()))
     assertEquals(CertificateSnapshotStatus.UNKNOWN, certificateSnapshotStatus(listOf("bad"), listOf(existingConfig)))
     assertEquals(CertificateSnapshotStatus.UNKNOWN, certificateSnapshotStatus(listOf(installed), listOf("bad")))
+    assertEquals(CertificateSnapshotStatus.UNKNOWN, certificateSnapshotStatus(listOf(installed, "bad"), listOf(existingConfig)))
   }
 }

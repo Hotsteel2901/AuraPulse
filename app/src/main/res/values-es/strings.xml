@@ -271,7 +271,7 @@
     <string name="sign_in_compatibility">Acceso compatible</string>
     <string name="sign_in_compatibility_help">El acceso compatible usa otro flujo de Google, pero sigue necesitando el certificado OAuth correcto y la verificación de Firebase.</string>
     <string name="diagnostics_snapshot_match">El SHA-1 instalado aparece en la configuración de Firebase usada al compilar. Esto no verifica la configuración actual ni otros requisitos de acceso.</string>
-    <string name="diagnostics_snapshot_mismatch">El SHA-1 instalado no aparece en la configuración de Firebase usada al compilar. La copia puede estar desactualizada; comprueba y registra esta huella en la consola de Firebase.</string>
+    <string name="diagnostics_snapshot_mismatch">Una o más huellas SHA-1 instaladas no aparecen en la configuración de Firebase usada al compilar. La copia puede estar desactualizada; comprueba y registra las huellas en la consola de Firebase.</string>
     <string name="diagnostics_snapshot_unknown">No se pudo comparar el certificado con la configuración usada al compilar. Compruébalo en la consola de Firebase.</string>
     <string name="minimize_player">Minimizar reproductor</string>
     <string name="track_progress">Progreso de la pista</string>

@@ -199,11 +199,65 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload Android Instrumentation APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurapulse-android-test-apk
+          path: app/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Unit & Robolectric Test Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aurapulse-unit-test-reports
           path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  android-emulator-tests:
+    name: Android Emulator Playback & Player UI Tests
+    runs-on: ubuntu-latest
+    needs: android-build-and-test
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: aurapulse-debug-apk
+          path: device-apks/app
+
+      - name: Download Instrumentation APK
+        uses: actions/download-artifact@v4
+        with:
+          name: aurapulse-android-test-apk
+          path: device-apks/test
+
+      - name: Enable Emulator Acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm || { echo "::error::This runner has no KVM support for Android emulator tests."; exit 1; }
+
+      - name: Run Tests on Android 15 Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: bash tools/run_device_tests.sh
+
+      - name: Upload Synthetic Player Screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurapulse-player-test-screenshot
+          path: device-player.png
           if-no-files-found: ignore
           retention-days: 14

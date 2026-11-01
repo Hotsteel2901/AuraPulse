@@ -271,7 +271,7 @@
     <string name="sign_in_compatibility">兼容模式登录</string>
     <string name="sign_in_compatibility_help">兼容登录使用另一种 Google 登录流程，仍需正确的 OAuth 签名和 Firebase 验证。</string>
     <string name="diagnostics_snapshot_match">已安装应用的 SHA-1 存在于构建时的 Firebase 配置快照中；这不能证明当前云端设置或其他登录条件正确。</string>
-    <string name="diagnostics_snapshot_mismatch">已安装应用的 SHA-1 不在构建时的 Firebase 配置快照中。该快照可能已过时，请在 Firebase 控制台核对并登记此指纹。</string>
+    <string name="diagnostics_snapshot_mismatch">至少一个已安装应用签名的 SHA-1 不在构建时的 Firebase 配置快照中。该快照可能已过时，请在 Firebase 控制台核对并登记这些指纹。</string>
     <string name="diagnostics_snapshot_unknown">无法使用构建时配置快照核对签名，请在 Firebase 控制台确认。</string>
     <string name="minimize_player">收起播放器</string>
     <string name="track_progress">播放进度</string>

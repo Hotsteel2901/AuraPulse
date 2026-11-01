@@ -58,6 +58,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilledTonalIconToggleButton
@@ -370,10 +371,10 @@ private fun ExpressiveTransport(state: PlaybackUiState, vm: MusicViewModel) {
   val playLabel = stringResource(if (state.isPlaying) R.string.pause else R.string.play)
   val nextLabel = stringResource(R.string.next_track)
   val leadingShape = IconButtonShapes(
-    RoundedCornerShape(topStart = 50, bottomStart = 50, topEnd = 12, bottomEnd = 12), RoundedCornerShape(24),
+    RoundedCornerShape(topStart = 40.dp, bottomStart = 40.dp, topEnd = 10.dp, bottomEnd = 10.dp), RoundedCornerShape(24.dp),
   )
   val trailingShape = IconButtonShapes(
-    RoundedCornerShape(topStart = 12, bottomStart = 12, topEnd = 50, bottomEnd = 50), RoundedCornerShape(24),
+    RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp, topEnd = 40.dp, bottomEnd = 40.dp), RoundedCornerShape(24.dp),
   )
   ButtonGroup(
     overflowIndicator = { menu -> ButtonGroupDefaults.OverflowIndicator(menu) },

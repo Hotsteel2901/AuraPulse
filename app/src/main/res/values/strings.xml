@@ -271,7 +271,7 @@
     <string name="sign_in_compatibility">Compatibility sign-in</string>
     <string name="sign_in_compatibility_help">Compatibility sign-in uses an alternative Google flow. It still requires the correct OAuth certificate and Firebase verification.</string>
     <string name="diagnostics_snapshot_match">The installed SHA-1 appears in the build-time Firebase configuration snapshot. This does not verify current cloud settings or other sign-in requirements.</string>
-    <string name="diagnostics_snapshot_mismatch">The installed SHA-1 is absent from the build-time Firebase configuration snapshot. The snapshot may be old; check and register this fingerprint in the Firebase console.</string>
+    <string name="diagnostics_snapshot_mismatch">One or more installed SHA-1 fingerprints are absent from the build-time Firebase configuration snapshot. The snapshot may be old; check and register these fingerprints in the Firebase console.</string>
     <string name="diagnostics_snapshot_unknown">The signing certificate could not be compared with the build-time snapshot. Check it in the Firebase console.</string>
     <string name="minimize_player">Minimize player</string>
     <string name="track_progress">Track progress</string>

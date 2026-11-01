@@ -271,7 +271,7 @@
     <string name="sign_in_compatibility">互換ログイン</string>
     <string name="sign_in_compatibility_help">互換ログインは別の Google ログイン方式を使用しますが、正しい OAuth 署名と Firebase による検証は必要です。</string>
     <string name="diagnostics_snapshot_match">インストール済みアプリの SHA-1 はビルド時の Firebase 設定に含まれています。現在のクラウド設定や他のログイン条件は確認できません。</string>
-    <string name="diagnostics_snapshot_mismatch">インストール済みアプリの SHA-1 はビルド時の Firebase 設定に含まれていません。設定は古い可能性があります。Firebase コンソールで指紋を確認し、登録してください。</string>
+    <string name="diagnostics_snapshot_mismatch">インストール済みアプリの署名の SHA-1 が、ビルド時の Firebase 設定にすべて含まれていません。設定は古い可能性があります。Firebase コンソールで指紋を確認し、登録してください。</string>
     <string name="diagnostics_snapshot_unknown">ビルド時の設定と署名を比較できませんでした。Firebase コンソールで確認してください。</string>
     <string name="minimize_player">プレーヤーを閉じる</string>
     <string name="track_progress">再生位置</string>

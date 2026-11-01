@@ -271,7 +271,7 @@
     <string name="sign_in_compatibility">Kompatible Anmeldung</string>
     <string name="sign_in_compatibility_help">Die kompatible Anmeldung nutzt einen anderen Google-Ablauf, benötigt aber weiterhin das korrekte OAuth-Zertifikat und die Firebase-Prüfung.</string>
     <string name="diagnostics_snapshot_match">Der SHA-1 der installierten App ist in der Firebase-Konfiguration zum Build-Zeitpunkt enthalten. Die aktuellen Cloud-Einstellungen und andere Anmeldevoraussetzungen sind damit nicht geprüft.</string>
-    <string name="diagnostics_snapshot_mismatch">Der SHA-1 der installierten App fehlt in der Firebase-Konfiguration zum Build-Zeitpunkt. Die Momentaufnahme kann veraltet sein; prüfe und registriere diesen Fingerabdruck in der Firebase-Konsole.</string>
+    <string name="diagnostics_snapshot_mismatch">Mindestens ein installierter SHA-1-Fingerabdruck fehlt in der Firebase-Konfiguration zum Build-Zeitpunkt. Die Momentaufnahme kann veraltet sein; prüfe und registriere die Fingerabdrücke in der Firebase-Konsole.</string>
     <string name="diagnostics_snapshot_unknown">Das Zertifikat konnte nicht mit der Konfiguration zum Build-Zeitpunkt verglichen werden. Bitte in der Firebase-Konsole prüfen.</string>
     <string name="minimize_player">Player minimieren</string>
     <string name="track_progress">Titelposition</string>

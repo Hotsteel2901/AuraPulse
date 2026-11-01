@@ -271,7 +271,7 @@
     <string name="sign_in_compatibility">호환 로그인</string>
     <string name="sign_in_compatibility_help">호환 로그인은 다른 Google 로그인 방식을 사용하지만 올바른 OAuth 서명과 Firebase 인증이 필요합니다.</string>
     <string name="diagnostics_snapshot_match">설치된 앱의 SHA-1이 빌드 시 Firebase 설정에 있습니다. 현재 클라우드 설정이나 다른 로그인 조건이 올바른지는 확인할 수 없습니다.</string>
-    <string name="diagnostics_snapshot_mismatch">설치된 앱의 SHA-1이 빌드 시 Firebase 설정에 없습니다. 설정이 오래되었을 수 있으므로 Firebase 콘솔에서 이 지문을 확인하고 등록하세요.</string>
+    <string name="diagnostics_snapshot_mismatch">설치된 앱의 서명 SHA-1 중 하나 이상이 빌드 시 Firebase 설정에 없습니다. 설정이 오래되었을 수 있으므로 Firebase 콘솔에서 지문을 확인하고 등록하세요.</string>
     <string name="diagnostics_snapshot_unknown">빌드 시 설정과 서명을 비교할 수 없습니다. Firebase 콘솔에서 확인하세요.</string>
     <string name="minimize_player">플레이어 접기</string>
     <string name="track_progress">재생 진행률</string>
