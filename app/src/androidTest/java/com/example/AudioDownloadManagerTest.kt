@@ -18,7 +18,9 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -97,7 +99,15 @@ class AudioDownloadManagerTest {
     }
   }
 
-  @Test fun cancellationInterruptsTheRequestAndDeletesThePartialFile(): Unit = runBlocking {
+  @Test fun coroutineAndManagerCancellationDeleteThePartialFile(): Unit = runBlocking {
+    verifyCancellation(cancelCoroutine = true)
+  }
+
+  @Test fun managerCancellationAloneIsReportedAsCancellation(): Unit = runBlocking {
+    verifyCancellation(cancelCoroutine = false)
+  }
+
+  private suspend fun verifyCancellation(cancelCoroutine: Boolean): Unit = coroutineScope {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val database = Room.inMemoryDatabaseBuilder(context, LibraryDatabase::class.java).build()
     val firstChunkSent = CountDownLatch(1)
@@ -124,9 +134,13 @@ class AudioDownloadManagerTest {
       val job = async(Dispatchers.IO) { manager.download(track) { _, _ -> } }
       try {
         assertTrue("Server never sent data", firstChunkSent.await(5, TimeUnit.SECONDS))
-        job.cancel(CancellationException("test cancellation"))
+        if (cancelCoroutine) job.cancel(CancellationException("test cancellation"))
         manager.cancel(track.id)
-        job.cancelAndJoin()
+        var cancelled = false
+        try { withTimeout(5_000) { job.await() } }
+        catch (timeout: TimeoutCancellationException) { throw timeout }
+        catch (_: CancellationException) { cancelled = true }
+        assertTrue("An explicitly cancelled request must not surface as a socket failure", cancelled)
         assertEquals(null, database.libraryDao().getTrack(track.id)?.downloadedPath)
         assertFalse(File(context.filesDir, "downloads/${track.id}.part").exists())
         assertFalse(File(context.filesDir, "downloads/${track.id}.audio").exists())

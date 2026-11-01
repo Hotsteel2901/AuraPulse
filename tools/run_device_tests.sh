@@ -20,8 +20,8 @@ if [ "${GITHUB_EVENT_NAME:-}" = pull_request ] && [ -f "$GITHUB_WORKSPACE/device
 import base64
 from pathlib import Path
 encoded = base64.b64encode(Path('device-player.png').read_bytes()).decode('ascii')
-for index, start in enumerate(range(0, len(encoded), 55000)):
-    print(f'::notice title=PLAYER_FRAME_{index:03d}::{encoded[start:start + 55000]}')
+for index, start in enumerate(range(0, len(encoded), 3500)):
+    print(f'::notice title=PLAYER_FRAME_{index:03d}::{encoded[start:start + 3500]}')
 PYFRAME
 fi
 if [ "$result" -ne 0 ] || ! grep -Eq 'OK \([0-9]+ tests?\)' "$RUNNER_TEMP/aurapulse-device-tests.log"; then

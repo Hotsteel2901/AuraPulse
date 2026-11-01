@@ -3,8 +3,11 @@ package com.example.data.library
 import android.content.Context
 import androidx.room.withTransaction
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -19,8 +22,11 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 class AudioDownloadManager(private val context: Context, private val db: LibraryDatabase) {
   private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS)
     .readTimeout(30, TimeUnit.SECONDS).callTimeout(15, TimeUnit.MINUTES).build()
-  private val calls = ConcurrentHashMap<String, Call>()
-  fun cancel(trackId: String) { calls[trackId]?.cancel() }
+  private class ActiveCall(val call: Call, val userCancelled: AtomicBoolean = AtomicBoolean(false))
+  private val calls = ConcurrentHashMap<String, ActiveCall>()
+  fun cancel(trackId: String) {
+    calls[trackId]?.let { active -> active.userCancelled.set(true); active.call.cancel() }
+  }
 
   suspend fun download(track: LibraryTrack, onBytes: (Long, Long?) -> Unit) = withContext(Dispatchers.IO) {
     require(track.source == TrackSource.DIRECT || track.source == TrackSource.CUSTOM)
@@ -30,7 +36,8 @@ class AudioDownloadManager(private val context: Context, private val db: Library
     val partial = File(dir, "${track.id}.part")
     val target = File(dir, "${track.id}.audio")
     val call = client.newCall(Request.Builder().url(url).header("User-Agent", "AuraPulse/1.0").build())
-    calls[track.id] = call
+    val active = ActiveCall(call)
+    calls[track.id] = active
     var committed = false
     try {
       currentCoroutineContext().ensureActive()
@@ -82,8 +89,15 @@ class AudioDownloadManager(private val context: Context, private val db: Library
         else target.delete()
       }
       committed = true
+    } catch (error: IOException) {
+      // OkHttp aborts a blocking read with a SocketException. If the caller
+      // cancelled, preserve coroutine cancellation instead of reporting a
+      // spurious download failure (or failing its parent scope).
+      currentCoroutineContext().ensureActive()
+      if (active.userCancelled.get()) throw CancellationException("Download cancelled").also { it.initCause(error) }
+      throw error
     } finally {
-      calls.remove(track.id, call)
+      calls.remove(track.id, active)
       partial.delete()
       if (!committed) {
         // Cancellation can arrive just after Room commits but before this coroutine resumes.
