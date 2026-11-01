@@ -30,7 +30,7 @@ import org.junit.runner.RunWith
 /** Network/download persistence checks against an in-process HTTP server, not a fabricated app download. */
 @RunWith(AndroidJUnit4::class)
 class AudioDownloadManagerTest {
-  @Test fun storesBytesAndReportsTheServersLength() = runBlocking {
+  @Test fun storesBytesAndReportsTheServersLength(): Unit = runBlocking {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val database = Room.inMemoryDatabaseBuilder(context, LibraryDatabase::class.java).build()
     val payload = ByteArray(32_768) { (it % 251).toByte() }
@@ -64,7 +64,7 @@ class AudioDownloadManagerTest {
     }
   }
 
-  @Test fun doesNotPretendAnHlsManifestIsAnOfflineAudioFile() = runBlocking {
+  @Test fun doesNotPretendAnHlsManifestIsAnOfflineAudioFile(): Unit = runBlocking {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val database = Room.inMemoryDatabaseBuilder(context, LibraryDatabase::class.java).build()
     val manifest = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=64000\nsegment.m3u8\n".toByteArray()
@@ -97,7 +97,7 @@ class AudioDownloadManagerTest {
     }
   }
 
-  @Test fun cancellationInterruptsTheRequestAndDeletesThePartialFile() = runBlocking {
+  @Test fun cancellationInterruptsTheRequestAndDeletesThePartialFile(): Unit = runBlocking {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val database = Room.inMemoryDatabaseBuilder(context, LibraryDatabase::class.java).build()
     val firstChunkSent = CountDownLatch(1)

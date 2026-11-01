@@ -84,7 +84,7 @@ fun SettingsScreen(vm: MusicViewModel, activity: MainActivity, onAbout: () -> Un
   var presetMenu by remember { mutableStateOf(false) }
   var diagnosticsOpen by rememberSaveable { mutableStateOf(false) }
   val currentLanguage = activity.getSharedPreferences("language", android.content.Context.MODE_PRIVATE).getString("locale", "system") ?: "system"
-  val languages = listOf("system" to stringResource(R.string.follow_system), "en" to "English", "zh-CN" to "简体中文", "zh-TW" to "繁體中文", "ja" to "日本語", "ko" to "한국어", "es" to "Español", "de" to "Deutsch")
+  val languages = listOf("system" to stringResource(R.string.follow_system), "en" to "English", "zh-CN" to "简体中文", "zh-TW" to "繁體中文（台灣）", "zh-HK" to "繁體中文（香港）", "ja" to "日本語", "ko" to "한국어", "es" to "Español", "de" to "Deutsch")
 
   Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(Modifier.widthIn(max = 820.dp).fillMaxWidth(), state = listState,
