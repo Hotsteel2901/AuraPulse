@@ -53,6 +53,9 @@ class FullPlayerTest {
         compose.waitUntil(timeoutMillis = 5_000) { vm.playback.value.repeatMode != previous }
       }
       compose.runOnUiThread { vm.play(tracks.first(), tracks) }
+      // MediaController commands cross a service boundary; a Compose-idle frame
+      // alone does not mean the remote timeline has arrived.
+      compose.waitUntil(timeoutMillis = 15_000) { vm.playback.value.track?.id == tracks.first().id }
       compose.onNodeWithTag("now-playing-screen").assertIsDisplayed()
       val rootSize = compose.onRoot().fetchSemanticsNode().size
       val playerSize = compose.onNodeWithTag("now-playing-screen").fetchSemanticsNode().size

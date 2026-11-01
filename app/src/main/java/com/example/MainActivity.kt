@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.os.LocaleList
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
@@ -57,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -97,7 +99,11 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    enableEdgeToEdge()
+    // The app intentionally uses a dark palette even when the system is light.
+    enableEdgeToEdge(
+      statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+      navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+    )
     setContent { AuraPulseTheme { AuraApp(this) } }
   }
 }
@@ -134,7 +140,10 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
   Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
     BoxWithConstraints {
       val wide = maxWidth >= 760.dp
-      Row(Modifier.fillMaxSize()) {
+      // The full-screen player covers this content visually; hide its semantics as
+      // well so TalkBack and UI tests cannot reach controls behind the player.
+      val backgroundSemantics = if (playerOpen) Modifier.clearAndSetSemantics { } else Modifier
+      Row(Modifier.fillMaxSize().then(backgroundSemantics)) {
         if (wide) {
           NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
             navigationDestinations.forEach { tab ->
@@ -194,6 +203,8 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
         enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.fastEffectsSpec()),
         exit = slideOutVertically(motion.fastSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec()),
       ) {
+        // PlayerScreenHost renders an opaque full-window Surface, which also
+        // intercepts pointer input over the underlying navigation and library.
         PlayerScreenHost(vm, visible = playerOpen, onDismiss = { playerOpen = false }, onEqualizer = {
           playerOpen = false; destination = Destination.SETTINGS; focusEqualizer = true
         })
