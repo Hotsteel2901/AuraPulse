@@ -48,6 +48,7 @@ class FullPlayerTest {
       assertEquals("Player should occupy the window width", rootSize.width, playerSize.width)
       assertEquals("Player should occupy the window height", rootSize.height, playerSize.height)
       compose.onNodeWithText(tracks.first().title).assertIsDisplayed()
+      compose.onNodeWithContentDescription(activity.getString(R.string.track_progress)).assertIsDisplayed()
       compose.onNodeWithContentDescription(activity.getString(R.string.minimize_player)).performClick()
       compose.onNodeWithTag("now-playing-screen").assertDoesNotExist()
       compose.runOnUiThread { vm.next() }

@@ -87,7 +87,7 @@ fun SettingsScreen(vm: MusicViewModel, activity: MainActivity, onAbout: () -> Un
   val languages = listOf("system" to stringResource(R.string.follow_system), "en" to "English", "zh-CN" to "简体中文", "zh-TW" to "繁體中文", "ja" to "日本語", "ko" to "한국어", "es" to "Español", "de" to "Deutsch")
 
   Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-    LazyColumn(Modifier.fillMaxWidth().widthIn(max = 820.dp), state = listState,
+    LazyColumn(Modifier.widthIn(max = 820.dp).fillMaxWidth(), state = listState,
       contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 36.dp),
       verticalArrangement = Arrangement.spacedBy(18.dp)) {
       item { PageHeader(stringResource(R.string.settings_eyebrow), stringResource(R.string.settings_title), stringResource(R.string.settings_subtitle)) }

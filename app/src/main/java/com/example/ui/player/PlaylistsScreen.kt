@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +57,7 @@ import com.example.R
 import com.example.data.library.LibraryPlaylist
 import com.example.data.library.LibraryTrack
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlaylistsScreen(vm: MusicViewModel) {
   val playlists by vm.playlists.collectAsStateWithLifecycle()
@@ -66,12 +69,12 @@ fun PlaylistsScreen(vm: MusicViewModel) {
 
   Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     if (selected == null) {
-      LazyColumn(Modifier.fillMaxWidth().widthIn(max = 820.dp),
+      LazyColumn(Modifier.widthIn(max = 820.dp).fillMaxWidth(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 30.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { PageHeader(stringResource(R.string.playlists_eyebrow), stringResource(R.string.playlists_title), stringResource(R.string.playlists_subtitle)) }
         item {
-          Button(onClick = { createDialog = true }) {
+          Button(onClick = { createDialog = true }, shapes = ButtonDefaults.shapes()) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(stringResource(R.string.new_playlist), modifier = Modifier.padding(start = 6.dp))
           }
@@ -113,6 +116,7 @@ fun PlaylistsScreen(vm: MusicViewModel) {
   )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PlaylistDetail(playlist: LibraryPlaylist, allTracks: List<LibraryTrack>, vm: MusicViewModel, onBack: () -> Unit, onDeleted: () -> Unit) {
   var edit by remember(playlist.id) { mutableStateOf(false) }
@@ -121,7 +125,7 @@ private fun PlaylistDetail(playlist: LibraryPlaylist, allTracks: List<LibraryTra
   val byId = remember(allTracks) { allTracks.associateBy { it.id } }
   val available = playlist.trackIds().mapNotNull(byId::get)
   val missing = playlist.trackIds().size - available.size
-  LazyColumn(Modifier.fillMaxWidth().widthIn(max = 820.dp),
+  LazyColumn(Modifier.widthIn(max = 820.dp).fillMaxWidth(),
     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 30.dp),
     verticalArrangement = Arrangement.spacedBy(14.dp)) {
     item {
@@ -138,7 +142,7 @@ private fun PlaylistDetail(playlist: LibraryPlaylist, allTracks: List<LibraryTra
     }
     item {
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { vm.playPlaylist(playlist) }, enabled = available.isNotEmpty()) {
+        Button(onClick = { vm.playPlaylist(playlist) }, shapes = ButtonDefaults.shapes(), enabled = available.isNotEmpty()) {
           Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
           Text(stringResource(R.string.play_all), modifier = Modifier.padding(start = 5.dp))
         }

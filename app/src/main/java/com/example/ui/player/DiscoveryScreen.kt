@@ -63,7 +63,7 @@ fun DiscoveryScreen(vm: MusicViewModel) {
 
   Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(
-      Modifier.fillMaxWidth().widthIn(max = 820.dp),
+      Modifier.widthIn(max = 820.dp).fillMaxWidth(),
       contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 30.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

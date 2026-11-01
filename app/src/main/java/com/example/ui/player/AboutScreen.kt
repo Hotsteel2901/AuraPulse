@@ -42,7 +42,7 @@ import com.example.R
 fun AboutScreen(onBack: () -> Unit) {
   val context = LocalContext.current
   Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-    LazyColumn(Modifier.fillMaxWidth().widthIn(max = 820.dp),
+    LazyColumn(Modifier.widthIn(max = 820.dp).fillMaxWidth(),
       contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 40.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp)) {
       item {
