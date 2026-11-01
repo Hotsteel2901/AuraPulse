@@ -246,7 +246,7 @@ private fun ExpressiveArtwork(track: LibraryTrack, playing: Boolean, limit: andr
         // The official Material 3 Expressive polygon gives the artwork a visible
         // scalloped silhouette rather than merely changing theme tokens.
         Box(Modifier.fillMaxSize().clip(MaterialShapes.Cookie9Sided.toShape())
-          .background(MaterialTheme.colorScheme.primaryContainer))
+          .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary))))
         TrackArtwork(current, diameter * .78f, Modifier.scale(scale))
         Box(Modifier.align(Alignment.BottomEnd).size(diameter * .19f)
           .clip(MaterialShapes.Sunny.toShape()).background(MaterialTheme.colorScheme.tertiary),

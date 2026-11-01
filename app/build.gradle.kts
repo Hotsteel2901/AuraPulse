@@ -111,20 +111,23 @@ tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServic
 // Variant-specific files take precedence in the same order as the Google Services plugin.
 listOf("debug", "release").forEach { buildType ->
   val capitalized = buildType.replaceFirstChar { it.uppercase() }
-  val output = layout.buildDirectory.dir("generated/oauth-diagnostics/$buildType")
+  // Resolve configuration values now so the task action captures no Project or
+  // script objects, and remains compatible with Gradle configuration caching.
+  val packageName = android.defaultConfig.applicationId.orEmpty()
+  val configurationFiles = listOf(
+    layout.projectDirectory.file("src/$buildType/google-services.json").asFile,
+    layout.projectDirectory.file("src/google-services.json").asFile,
+    layout.projectDirectory.file("google-services.json").asFile,
+  )
+  val outputDirectory = layout.buildDirectory.dir("generated/oauth-diagnostics/$buildType").get().asFile
   val generateDiagnostics = tasks.register("generate${capitalized}OAuthDiagnostics") {
     dependsOn(prepareGoogleServices)
-    outputs.dir(output)
+    outputs.dir(outputDirectory)
     // The Google Services file can be replaced locally without a source-code change.
     outputs.upToDateWhen { false }
     doLast {
-      val source = listOf(
-        file("src/$buildType/google-services.json"),
-        file("src/google-services.json"),
-        file("google-services.json"),
-      ).firstOrNull { it.isFile }
+      val source = configurationFiles.firstOrNull { it.isFile }
       val data = source?.let { runCatching { JsonSlurper().parse(it) as? Map<*, *> }.getOrNull() }
-      val packageName = android.defaultConfig.applicationId.orEmpty()
       val projectId = (data?.get("project_info") as? Map<*, *>)?.get("project_id") as? String
       val clients = data?.get("client") as? List<*> ?: emptyList<Any>()
       val matchingClient = clients.filterIsInstance<Map<*, *>>().firstOrNull { client ->
@@ -139,7 +142,7 @@ listOf("debug", "release").forEach { buildType ->
         .filter { it["package_name"] == packageName }
         .mapNotNull { (it["certificate_hash"] as? String)?.uppercase() }
         .filter { it.matches(Regex("[0-9A-F]{40}")) }.distinct()
-      val directory = output.get().asFile.apply { mkdirs() }
+      val directory = outputDirectory.apply { mkdirs() }
       directory.resolve("google-oauth-diagnostics.json").writeText(JsonOutput.toJson(mapOf(
         "packageName" to packageName, "projectId" to projectId, "sha1" to fingerprints,
       )))
@@ -147,7 +150,7 @@ listOf("debug", "release").forEach { buildType ->
   }
   // AGP 9 disallows Provider instances in the legacy source-set API. Use the
   // directory as a File and explicitly wire the generating task below.
-  android.sourceSets.getByName(buildType).assets.srcDir(output.get().asFile)
+  android.sourceSets.getByName(buildType).assets.srcDir(outputDirectory)
   tasks.matching { it.name.startsWith("merge$capitalized") && it.name.endsWith("Assets") }
     .configureEach { dependsOn(generateDiagnostics) }
 }
