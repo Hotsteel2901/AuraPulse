@@ -1,6 +1,8 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.time.Duration
 import java.util.Base64
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 
 plugins {
   alias(libs.plugins.android.application)
@@ -104,6 +106,50 @@ val prepareGoogleServices = tasks.register("prepareGoogleServices") {
 tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServices") }
   .configureEach { dependsOn(prepareGoogleServices) }
 
+// Bundle only the public SHA-1 entries from the Google Services file used for this
+// build. This is an offline snapshot, NOT proof of what is registered in Firebase now.
+// Variant-specific files take precedence in the same order as the Google Services plugin.
+listOf("debug", "release").forEach { buildType ->
+  val capitalized = buildType.replaceFirstChar { it.uppercase() }
+  val output = layout.buildDirectory.dir("generated/oauth-diagnostics/$buildType")
+  val generateDiagnostics = tasks.register("generate${capitalized}OAuthDiagnostics") {
+    dependsOn(prepareGoogleServices)
+    outputs.dir(output)
+    // The Google Services file can be replaced locally without a source-code change.
+    outputs.upToDateWhen { false }
+    doLast {
+      val source = listOf(
+        file("src/$buildType/google-services.json"),
+        file("src/google-services.json"),
+        file("google-services.json"),
+      ).firstOrNull { it.isFile }
+      val data = source?.let { runCatching { JsonSlurper().parse(it) as? Map<*, *> }.getOrNull() }
+      val packageName = android.defaultConfig.applicationId.orEmpty()
+      val projectId = (data?.get("project_info") as? Map<*, *>)?.get("project_id") as? String
+      val clients = data?.get("client") as? List<*> ?: emptyList<Any>()
+      val matchingClient = clients.filterIsInstance<Map<*, *>>().firstOrNull { client ->
+        val info = client["client_info"] as? Map<*, *>
+        val androidInfo = info?.get("android_client_info") as? Map<*, *>
+        androidInfo?.get("package_name") == packageName
+      }
+      val fingerprints = ((matchingClient?.get("oauth_client") as? List<*>) ?: emptyList<Any>())
+        .filterIsInstance<Map<*, *>>()
+        .filter { (it["client_type"] as? Number)?.toInt() == 1 }
+        .mapNotNull { it["android_info"] as? Map<*, *> }
+        .filter { it["package_name"] == packageName }
+        .mapNotNull { (it["certificate_hash"] as? String)?.uppercase() }
+        .filter { it.matches(Regex("[0-9A-F]{40}")) }.distinct()
+      val directory = output.get().asFile.apply { mkdirs() }
+      directory.resolve("google-oauth-diagnostics.json").writeText(JsonOutput.toJson(mapOf(
+        "packageName" to packageName, "projectId" to projectId, "sha1" to fingerprints,
+      )))
+    }
+  }
+  android.sourceSets.getByName(buildType).assets.srcDir(output)
+  tasks.matching { it.name.startsWith("merge$capitalized") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(generateDiagnostics) }
+}
+
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
@@ -148,6 +194,7 @@ dependencies {
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
   implementation(libs.play.services.basement)
+  implementation(libs.play.services.auth)
   // implementation(libs.firebase.appcheck.recaptcha)
   // implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)

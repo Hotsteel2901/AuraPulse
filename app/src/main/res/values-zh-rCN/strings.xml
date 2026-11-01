@@ -246,8 +246,6 @@
     <string name="share_privacy">分享只包含标题和艺术家，不包含私密链接或本地路径。</string>
     <string name="share_track">分享曲目</string>
     <string name="sign_in_account_selector">使用账号选择器</string>
-    <string name="sign_in_alternative_help">如果 Google 按钮失败，请尝试账号选择器。两种方式都需要通过 Firebase 身份验证。</string>
-    <string name="sign_in_cancelled">Google 账号选择已取消。如果你并未取消，请查看登录诊断。</string>
     <string name="sign_in_diagnostics">登录诊断</string>
     <string name="sign_in_latest_issue">最近一次登录结果</string>
     <string name="skip_silence">跳过静音</string>
@@ -269,4 +267,14 @@
     <string name="track_details">曲目信息</string>
     <string name="track_unavailable">无法添加此曲目。</string>
     <string name="unknown_album">未知专辑</string>
+    <string name="sign_in_interrupted">Google 登录流程已中断；这可能是主动取消，也可能是 OAuth、签名或 Play 服务问题。请查看登录诊断。</string>
+    <string name="sign_in_compatibility">兼容模式登录</string>
+    <string name="sign_in_compatibility_help">兼容登录使用另一种 Google 登录流程，仍需正确的 OAuth 签名和 Firebase 验证。</string>
+    <string name="diagnostics_snapshot_match">已安装应用的 SHA-1 存在于构建时的 Firebase 配置快照中；这不能证明当前云端设置或其他登录条件正确。</string>
+    <string name="diagnostics_snapshot_mismatch">已安装应用的 SHA-1 不在构建时的 Firebase 配置快照中。该快照可能已过时，请在 Firebase 控制台核对并登记此指纹。</string>
+    <string name="diagnostics_snapshot_unknown">无法使用构建时配置快照核对签名，请在 Firebase 控制台确认。</string>
+    <string name="minimize_player">收起播放器</string>
+    <string name="track_progress">播放进度</string>
+    <string name="about_author_body">AuraPulse 由 h0to9（@Hotsteel2901）创建并维护。这是一个开源音乐播放器，提供真实的本地和在线音乐体验。</string>
+    <string name="view_author_profile">访问作者的 GitHub 主页</string>
 </resources>

@@ -246,8 +246,6 @@
     <string name="share_privacy">Sharing includes the title and artist only, not private links or local paths.</string>
     <string name="share_track">Share track</string>
     <string name="sign_in_account_selector">Use account selector</string>
-    <string name="sign_in_alternative_help">Try the account selector if the Google button fails. Both methods still authenticate with Firebase.</string>
-    <string name="sign_in_cancelled">The Google chooser was cancelled. If you did not cancel it, check sign-in diagnostics.</string>
     <string name="sign_in_diagnostics">Sign-in diagnostics</string>
     <string name="sign_in_latest_issue">Last sign-in result</string>
     <string name="skip_silence">Skip silence</string>
@@ -269,4 +267,14 @@
     <string name="track_details">Track details</string>
     <string name="track_unavailable">This track is not available to add.</string>
     <string name="unknown_album">Unknown album</string>
+    <string name="sign_in_interrupted">Google sign-in was interrupted. This can be a cancellation or an OAuth, certificate, or Play services problem. Check sign-in diagnostics.</string>
+    <string name="sign_in_compatibility">Compatibility sign-in</string>
+    <string name="sign_in_compatibility_help">Compatibility sign-in uses an alternative Google flow. It still requires the correct OAuth certificate and Firebase verification.</string>
+    <string name="diagnostics_snapshot_match">The installed SHA-1 appears in the build-time Firebase configuration snapshot. This does not verify current cloud settings or other sign-in requirements.</string>
+    <string name="diagnostics_snapshot_mismatch">The installed SHA-1 is absent from the build-time Firebase configuration snapshot. The snapshot may be old; check and register this fingerprint in the Firebase console.</string>
+    <string name="diagnostics_snapshot_unknown">The signing certificate could not be compared with the build-time snapshot. Check it in the Firebase console.</string>
+    <string name="minimize_player">Minimize player</string>
+    <string name="track_progress">Track progress</string>
+    <string name="about_author_body">AuraPulse is created and maintained by h0to9 (@Hotsteel2901). It is an open-source player for genuine local and online music.</string>
+    <string name="view_author_profile">Visit the author on GitHub</string>
 </resources>

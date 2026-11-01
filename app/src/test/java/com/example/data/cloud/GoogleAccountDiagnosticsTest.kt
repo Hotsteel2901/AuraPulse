@@ -26,6 +26,13 @@ class GoogleAccountDiagnosticsTest {
     assertTrue(summary.contains("GetCredentialCancellationException"))
   }
 
+  @Test fun bracketedPlayServicesStatusIsExtractedWithoutRevealingTheMessage() {
+    val summary = GoogleAccount.describeFailure(GetCredentialCancellationException("[16] Account reauth failed for private@example.com"))
+    assertTrue(summary.contains("16"))
+    assertFalse(summary.contains("private@example.com"))
+    assertFalse(summary.contains("Account reauth failed"))
+  }
+
   @Test fun bothCredentialErrorsRemainVisible() {
     val summary = GoogleAccount.describeFailure(CredentialFlowsFailed(IllegalStateException(), IllegalArgumentException()))
     assertTrue(summary.contains("IllegalStateException"))

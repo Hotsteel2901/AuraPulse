@@ -246,8 +246,6 @@
     <string name="share_privacy">Geteilt werden nur Titel und Interpret, keine privaten Links oder lokalen Pfade.</string>
     <string name="share_track">Titel teilen</string>
     <string name="sign_in_account_selector">Kontoauswahl verwenden</string>
-    <string name="sign_in_alternative_help">Falls die Google-Schaltfläche fehlschlägt, versuche die Kontoauswahl. Beide Methoden authentifizieren über Firebase.</string>
-    <string name="sign_in_cancelled">Die Google-Kontoauswahl wurde abgebrochen. Falls du sie nicht abgebrochen hast, prüfe die Anmeldediagnose.</string>
     <string name="sign_in_diagnostics">Anmeldediagnose</string>
     <string name="sign_in_latest_issue">Letztes Anmeldeergebnis</string>
     <string name="skip_silence">Stille überspringen</string>
@@ -269,4 +267,14 @@
     <string name="track_details">Titeldetails</string>
     <string name="track_unavailable">Dieser Titel kann nicht hinzugefügt werden.</string>
     <string name="unknown_album">Unbekanntes Album</string>
+    <string name="sign_in_interrupted">Die Google-Anmeldung wurde unterbrochen. Grund kann ein Abbruch oder ein Problem mit OAuth, dem Zertifikat oder den Play-Diensten sein. Sieh dir die Anmeldediagnose an.</string>
+    <string name="sign_in_compatibility">Kompatible Anmeldung</string>
+    <string name="sign_in_compatibility_help">Die kompatible Anmeldung nutzt einen anderen Google-Ablauf, benötigt aber weiterhin das korrekte OAuth-Zertifikat und die Firebase-Prüfung.</string>
+    <string name="diagnostics_snapshot_match">Der SHA-1 der installierten App ist in der Firebase-Konfiguration zum Build-Zeitpunkt enthalten. Die aktuellen Cloud-Einstellungen und andere Anmeldevoraussetzungen sind damit nicht geprüft.</string>
+    <string name="diagnostics_snapshot_mismatch">Der SHA-1 der installierten App fehlt in der Firebase-Konfiguration zum Build-Zeitpunkt. Die Momentaufnahme kann veraltet sein; prüfe und registriere diesen Fingerabdruck in der Firebase-Konsole.</string>
+    <string name="diagnostics_snapshot_unknown">Das Zertifikat konnte nicht mit der Konfiguration zum Build-Zeitpunkt verglichen werden. Bitte in der Firebase-Konsole prüfen.</string>
+    <string name="minimize_player">Player minimieren</string>
+    <string name="track_progress">Titelposition</string>
+    <string name="about_author_body">AuraPulse wird von h0to9 (@Hotsteel2901) entwickelt und gepflegt. Der Open-Source-Player spielt echte lokale und Online-Musik ab.</string>
+    <string name="view_author_profile">GitHub-Profil des Autors öffnen</string>
 </resources>

@@ -25,6 +25,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
@@ -54,7 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.library.TrackSource
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LibraryScreen(vm: MusicViewModel, importing: Boolean, onPickFiles: () -> Unit, onPickFolder: () -> Unit, onDiscover: () -> Unit) {
   val tracks by vm.tracks.collectAsStateWithLifecycle()
@@ -110,12 +113,12 @@ fun LibraryScreen(vm: MusicViewModel, importing: Boolean, onPickFiles: () -> Uni
           Text(stringResource(R.string.hero_body), style = MaterialTheme.typography.bodyMedium, color = Color(0xFFD0E0D0))
           Spacer(Modifier.height(4.dp))
           FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Button(onClick = onPickFiles, enabled = !importing) {
+            Button(onClick = onPickFiles, shapes = ButtonDefaults.shapes(), enabled = !importing) {
               if (importing) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
               else Icon(Icons.Default.AudioFile, contentDescription = null, modifier = Modifier.size(18.dp))
               Text(stringResource(if (importing) R.string.importing else R.string.import_files), modifier = Modifier.padding(start = 7.dp), maxLines = 1)
             }
-            OutlinedButton(onClick = onPickFolder, enabled = !importing) {
+            OutlinedButton(onClick = onPickFolder, shapes = ButtonDefaults.shapes(), enabled = !importing) {
               Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
               Text(stringResource(R.string.import_folder), modifier = Modifier.padding(start = 6.dp), maxLines = 1)
             }
@@ -151,7 +154,7 @@ fun LibraryScreen(vm: MusicViewModel, importing: Boolean, onPickFiles: () -> Uni
           FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             listOf("all" to R.string.filter_all, "files" to R.string.filter_files, "online" to R.string.filter_online,
               "favorites" to R.string.filter_favorites, "downloads" to R.string.filter_downloads, "history" to R.string.filter_history).forEach { (id, label) ->
-              FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(stringResource(label)) })
+              FilterChip(selected = filter == id, onClick = { filter = id }, shapes = FilterChipDefaults.shapes(), label = { Text(stringResource(label)) })
             }
           }
           Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

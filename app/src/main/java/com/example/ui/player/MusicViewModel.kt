@@ -3,6 +3,7 @@ package com.example.ui.player
 import android.app.Activity
 import android.app.Application
 import android.content.ComponentName
+import android.content.Intent
 import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
@@ -35,6 +36,7 @@ import com.example.data.library.ListeningStore
 import com.example.data.library.TrackSource
 import com.example.data.library.UnsupportedStreamingPlaylistException
 import com.example.data.library.stableTrackId
+import com.google.android.gms.common.api.ApiException
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -97,6 +99,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   private val sessionTracks = mutableMapOf<String, LibraryTrack>()
   private var indexedTracks: Map<String, LibraryTrack> = emptyMap()
   private var controller: MediaController? = null
+  val playerReady: Boolean get() = controller != null
 
   val tracks = library.tracks.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
   val playlists = library.playlists.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -131,6 +134,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   // Queue errors raised during startup until the activity is ready to display them.
   private val mutableNotices = Channel<Notice>(Channel.BUFFERED)
   val notices = mutableNotices.receiveAsFlow()
+  // Only deliberate play requests open the full player. Media transitions, notification
+  // controls and automatic next tracks do not interrupt the current screen.
+  private val mutableOpenPlayerRequests = Channel<Unit>(Channel.CONFLATED)
+  val openPlayerRequests = mutableOpenPlayerRequests.receiveAsFlow()
 
   private val controllerFuture = MediaController.Builder(
     application, SessionToken(application, ComponentName(application, PlaybackService::class.java))
@@ -221,6 +228,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
       player.play()
       refreshQueue(player)
       refreshPlayback(player)
+      mutableOpenPlayerRequests.trySend(Unit)
     } catch (e: Exception) { notify(R.string.playback_error, safeError(e)) }
   }
 
@@ -435,28 +443,46 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
   }
 
   fun signIn(activity: Activity, useAccountSelector: Boolean = false) = viewModelScope.launch {
+    if (mutableBusy.value) return@launch
     mutableBusy.value = true
     mutableSignInIssue.value = null
     try { GoogleAccount.signIn(activity, useAccountSelector); notify(R.string.signed_in) }
-    catch (e: CredentialFallbackCancelled) {
-      mutableSignInIssue.value = GoogleAccount.describeFailure(e)
-      notify(R.string.sign_in_cancelled)
-    }
-    catch (e: GetCredentialCancellationException) {
-      // Some Play Services versions also report configuration failures as cancellation.
-      mutableSignInIssue.value = GoogleAccount.describeFailure(e)
-      notify(R.string.sign_in_cancelled)
-    }
-    catch (_: MissingFirebaseConfiguration) {
+    catch (e: CancellationException) { throw e }
+    catch (e: Exception) { reportSignInFailure(activity, e) }
+    finally { mutableBusy.value = false }
+  }
+
+  /** Explicit fallback for Credential Manager incompatibilities, not a bypass of Firebase. */
+  fun startCompatibilitySignIn(activity: Activity, launch: (Intent) -> Unit) {
+    if (mutableBusy.value) return
+    mutableBusy.value = true
+    mutableSignInIssue.value = null
+    try { launch(GoogleAccount.compatibilitySignInIntent(activity)) }
+    catch (e: Exception) { reportSignInFailure(activity, e); mutableBusy.value = false }
+  }
+
+  fun finishCompatibilitySignIn(activity: Activity, data: Intent?) = viewModelScope.launch {
+    try { GoogleAccount.finishCompatibilitySignIn(data); notify(R.string.signed_in) }
+    catch (e: CancellationException) { throw e }
+    catch (e: Exception) { reportSignInFailure(activity, e) }
+    finally { mutableBusy.value = false }
+  }
+
+  private fun reportSignInFailure(activity: Activity, error: Exception) {
+    if (error is MissingFirebaseConfiguration) {
       mutableSignInIssue.value = activity.getString(R.string.firebase_not_configured)
       notify(R.string.firebase_not_configured)
+      return
     }
-    catch (e: CancellationException) { throw e }
-    catch (e: Exception) {
-      mutableSignInIssue.value = GoogleAccount.describeFailure(e)
-      notify(R.string.sign_in_failed, e.javaClass.simpleName)
+    mutableSignInIssue.value = GoogleAccount.describeFailure(error)
+    // Google and Play services sometimes report OAuth/configuration failures as a
+    // cancellation even when the person never dismissed the chooser.
+    if (error is CredentialFallbackCancelled || error is GetCredentialCancellationException ||
+      (error is ApiException && error.statusCode == 12501)) {
+      notify(R.string.sign_in_interrupted)
+    } else {
+      notify(R.string.sign_in_failed, error.javaClass.simpleName)
     }
-    finally { mutableBusy.value = false }
   }
   fun signOut(activity: Activity) = viewModelScope.launch {
     mutableBusy.value = true
@@ -495,6 +521,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     controller?.removeListener(playerListener)
     MediaController.releaseFuture(controllerFuture)
     mutableNotices.close()
+    mutableOpenPlayerRequests.close()
     super.onCleared()
   }
 }

@@ -15,6 +15,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Explore
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -51,6 +54,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -61,7 +65,7 @@ import com.example.ui.player.DiscoveryScreen
 import com.example.ui.player.LibraryScreen
 import com.example.ui.player.MiniPlayer
 import com.example.ui.player.MusicViewModel
-import com.example.ui.player.NowPlayingSheet
+import com.example.ui.player.NowPlayingScreen
 import com.example.ui.player.PlaylistsScreen
 import com.example.ui.player.SettingsScreen
 import com.example.ui.theme.AuraPulseTheme
@@ -119,6 +123,7 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
   LaunchedEffect(vm, activity) {
     vm.notices.collect { notice -> snackbar.showSnackbar(activity.getString(notice.resource, *notice.args.toTypedArray())) }
   }
+  LaunchedEffect(vm) { vm.openPlayerRequests.collect { playerOpen = true } }
   BackHandler(enabled = destination != Destination.LIBRARY && !playerOpen) {
     destination = if (destination == Destination.ABOUT) Destination.SETTINGS else Destination.LIBRARY
   }
@@ -140,7 +145,7 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
         Scaffold(
           modifier = Modifier.weight(1f), containerColor = MaterialTheme.colorScheme.background,
           contentWindowInsets = WindowInsets.safeDrawing,
-          snackbarHost = { SnackbarHost(snackbar) },
+          snackbarHost = { if (!playerOpen) SnackbarHost(snackbar) },
           bottomBar = {
             Column {
               MiniPlayerHost(vm, onOpen = { playerOpen = true })
@@ -181,11 +186,16 @@ private fun AuraApp(activity: MainActivity, vm: MusicViewModel = viewModel()) {
           }
         }
       }
-      if (playerOpen) {
-        PlayerSheetHost(vm, onDismiss = { playerOpen = false }, onEqualizer = {
+      AnimatedVisibility(
+        visible = playerOpen, modifier = Modifier.fillMaxSize(),
+        enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.fastEffectsSpec()),
+        exit = slideOutVertically(motion.fastSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec()),
+      ) {
+        PlayerScreenHost(vm, visible = playerOpen, onDismiss = { playerOpen = false }, onEqualizer = {
           playerOpen = false; destination = Destination.SETTINGS; focusEqualizer = true
         })
       }
+      if (playerOpen) SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp))
     }
   }
 }
@@ -202,9 +212,22 @@ private fun MiniPlayerHost(vm: MusicViewModel, onOpen: () -> Unit) {
   }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PlayerSheetHost(vm: MusicViewModel, onDismiss: () -> Unit, onEqualizer: () -> Unit) {
+private fun PlayerScreenHost(vm: MusicViewModel, visible: Boolean, onDismiss: () -> Unit, onEqualizer: () -> Unit) {
   val playback by vm.playback.collectAsStateWithLifecycle()
-  LaunchedEffect(playback.track == null) { if (playback.track == null) onDismiss() }
-  if (playback.track != null) NowPlayingSheet(state = playback, vm = vm, onDismiss = onDismiss, onEqualizer = onEqualizer)
+  var hadTrack by remember { mutableStateOf(false) }
+  BackHandler(enabled = visible) { onDismiss() }
+  LaunchedEffect(playback.track) {
+    if (playback.track != null) hadTrack = true else if (hadTrack) onDismiss()
+  }
+  if (playback.track != null) {
+    NowPlayingScreen(state = playback, vm = vm, onDismiss = onDismiss, onEqualizer = onEqualizer)
+  } else {
+    // The controller can reconnect after activity recreation; let it recover without
+    // closing the player before the restored queue has arrived.
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+      Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+    }
+  }
 }

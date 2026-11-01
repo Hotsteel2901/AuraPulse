@@ -24,6 +24,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -49,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.discovery.DiscoverySource
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DiscoveryScreen(vm: MusicViewModel) {
   val state by vm.discoveryState.collectAsStateWithLifecycle()
@@ -68,7 +72,7 @@ fun DiscoveryScreen(vm: MusicViewModel) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           listOf(DiscoverySource.PREVIEWS to R.string.source_previews_tab, DiscoverySource.RADIO to R.string.source_radio_tab,
             DiscoverySource.CUSTOM to R.string.source_custom_tab).forEach { (source, label) ->
-            FilterChip(selected = state.source == source, onClick = { vm.setDiscoverySource(source) }, label = { Text(stringResource(label)) })
+            FilterChip(selected = state.source == source, onClick = { vm.setDiscoverySource(source) }, shapes = FilterChipDefaults.shapes(), label = { Text(stringResource(label)) })
           }
         }
       }
@@ -105,7 +109,7 @@ fun DiscoveryScreen(vm: MusicViewModel) {
             value = state.country, onValueChange = vm::setCountry, modifier = Modifier.width(112.dp), singleLine = true,
             label = { Text(stringResource(R.string.country_code)) }, enabled = state.source != DiscoverySource.RADIO,
           )
-          Button(onClick = vm::search, enabled = !state.loading, modifier = Modifier.weight(1f)) {
+          Button(onClick = vm::search, shapes = ButtonDefaults.shapes(), enabled = !state.loading, modifier = Modifier.weight(1f)) {
             if (state.loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
             else Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(stringResource(if (state.loading) R.string.searching else R.string.search), modifier = Modifier.padding(start = 8.dp))

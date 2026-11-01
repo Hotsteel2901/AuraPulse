@@ -1,5 +1,7 @@
 package com.example.ui.player
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +63,7 @@ import com.example.R
 import com.example.audio.DeviceEqualizer
 import com.example.audio.EqualizerPreset
 import com.example.data.cloud.GoogleAccount
+import com.example.data.cloud.CertificateSnapshotStatus
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -70,6 +73,9 @@ fun SettingsScreen(vm: MusicViewModel, activity: MainActivity, onAbout: () -> Un
   val busy by vm.busy.collectAsStateWithLifecycle()
   val eq by vm.equalizer.collectAsStateWithLifecycle()
   val signInIssue by vm.signInIssue.collectAsStateWithLifecycle()
+  val compatibilityLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    vm.finishCompatibilitySignIn(activity, result.data)
+  }
   val listState = rememberLazyListState()
   LaunchedEffect(focusEqualizer) { if (focusEqualizer) { listState.animateScrollToItem(3); onFocusHandled() } }
   var backupConfirm by rememberSaveable { mutableStateOf(false) }
@@ -112,8 +118,11 @@ fun SettingsScreen(vm: MusicViewModel, activity: MainActivity, onAbout: () -> Un
               OutlinedButton(onClick = { vm.signIn(activity, useAccountSelector = true) }, enabled = !busy) {
                 Text(stringResource(R.string.sign_in_account_selector))
               }
+              OutlinedButton(onClick = {
+                vm.startCompatibilitySignIn(activity) { compatibilityLauncher.launch(it) }
+              }, enabled = !busy) { Text(stringResource(R.string.sign_in_compatibility)) }
             }
-            Text(stringResource(R.string.sign_in_alternative_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.sign_in_compatibility_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           } else {
             OutlinedButton(onClick = { vm.signOut(activity) }, enabled = !busy) { Text(stringResource(R.string.sign_out)) }
           }
@@ -264,6 +273,14 @@ private fun SignInDiagnosticsDialog(activity: MainActivity, issue: String?, onDi
         Text(stringResource(R.string.diagnostics_play_services, status))
         Text("SHA-1\n$sha1", style = MaterialTheme.typography.bodySmall)
         Text("SHA-256\n$sha256", style = MaterialTheme.typography.bodySmall)
+        val snapshotLabel = when (diagnostics.certificateSnapshotStatus) {
+          CertificateSnapshotStatus.MATCH -> R.string.diagnostics_snapshot_match
+          CertificateSnapshotStatus.NOT_IN_SNAPSHOT -> R.string.diagnostics_snapshot_mismatch
+          CertificateSnapshotStatus.UNKNOWN -> R.string.diagnostics_snapshot_unknown
+        }
+        Text(stringResource(snapshotLabel), style = MaterialTheme.typography.bodySmall,
+          color = if (diagnostics.certificateSnapshotStatus == CertificateSnapshotStatus.NOT_IN_SNAPSHOT)
+            MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
         if (issue != null) Text(issue, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         Text(stringResource(R.string.diagnostics_firebase_steps), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedButton(onClick = { clipboard.setText(AnnotatedString("SHA-1: $sha1\nSHA-256: $sha256")) }) {

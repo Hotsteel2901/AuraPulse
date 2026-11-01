@@ -150,11 +150,18 @@ jobs:
           fi
 
       - name: Assemble Debug APK and Device Test APK
+        shell: bash
         run: |
+          set +e
           if [ -f ./gradlew ]; then
-            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/aurapulse-assemble.log"
           else
-            gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+            gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/aurapulse-assemble.log"
+          fi
+          result=${PIPESTATUS[0]}
+          if [ "$result" -ne 0 ]; then
+            python3 tools/report_build_failures.py "$RUNNER_TEMP/aurapulse-assemble.log"
+            exit "$result"
           fi
 
       - name: Start Firebase Emulators & Run Unit + Robolectric Tests

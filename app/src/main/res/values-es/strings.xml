@@ -246,8 +246,6 @@
     <string name="share_privacy">Solo se comparten el título y el artista, no los enlaces privados ni las rutas locales.</string>
     <string name="share_track">Compartir pista</string>
     <string name="sign_in_account_selector">Usar selector de cuentas</string>
-    <string name="sign_in_alternative_help">Prueba el selector si falla el botón de Google. Ambos métodos se autentican con Firebase.</string>
-    <string name="sign_in_cancelled">Se canceló la selección de Google. Si no la cancelaste, revisa el diagnóstico de inicio de sesión.</string>
     <string name="sign_in_diagnostics">Diagnóstico de inicio de sesión</string>
     <string name="sign_in_latest_issue">Último resultado de inicio de sesión</string>
     <string name="skip_silence">Omitir silencios</string>
@@ -269,4 +267,14 @@
     <string name="track_details">Detalles de la pista</string>
     <string name="track_unavailable">Esta pista no se puede añadir.</string>
     <string name="unknown_album">Álbum desconocido</string>
+    <string name="sign_in_interrupted">Se interrumpió el acceso con Google. Puede deberse a una cancelación o a un problema de OAuth, del certificado o de los servicios de Play. Consulta el diagnóstico.</string>
+    <string name="sign_in_compatibility">Acceso compatible</string>
+    <string name="sign_in_compatibility_help">El acceso compatible usa otro flujo de Google, pero sigue necesitando el certificado OAuth correcto y la verificación de Firebase.</string>
+    <string name="diagnostics_snapshot_match">El SHA-1 instalado aparece en la configuración de Firebase usada al compilar. Esto no verifica la configuración actual ni otros requisitos de acceso.</string>
+    <string name="diagnostics_snapshot_mismatch">El SHA-1 instalado no aparece en la configuración de Firebase usada al compilar. La copia puede estar desactualizada; comprueba y registra esta huella en la consola de Firebase.</string>
+    <string name="diagnostics_snapshot_unknown">No se pudo comparar el certificado con la configuración usada al compilar. Compruébalo en la consola de Firebase.</string>
+    <string name="minimize_player">Minimizar reproductor</string>
+    <string name="track_progress">Progreso de la pista</string>
+    <string name="about_author_body">AuraPulse ha sido creado y es mantenido por h0to9 (@Hotsteel2901). Es un reproductor de código abierto para música local y en línea real.</string>
+    <string name="view_author_profile">Visitar el perfil del autor en GitHub</string>
 </resources>

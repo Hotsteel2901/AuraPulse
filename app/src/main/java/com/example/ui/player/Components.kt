@@ -33,6 +33,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,13 +64,20 @@ import com.example.data.library.LibraryPlaylist
 import com.example.data.library.LibraryTrack
 import com.example.data.library.TrackSource
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PageHeader(eyebrow: String, title: String, subtitle: String) {
-  Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-    Text(eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-      color = MaterialTheme.colorScheme.primary, letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified)
-    Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+  Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(15.dp)) {
+    Box(Modifier.size(50.dp).clip(MaterialShapes.Sunny.toShape()).background(MaterialTheme.colorScheme.primary),
+      contentAlignment = Alignment.Center) {
+      Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(25.dp), tint = MaterialTheme.colorScheme.onPrimary)
+    }
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      Text(eyebrow.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary, letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified)
+      Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+      Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
   }
 }
 
