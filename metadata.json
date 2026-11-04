@@ -1,6 +1,6 @@
 {
   "name": "AuraPulse",
-  "description": "An Android music player for local audio, playlists, real online sources, and optional manual cloud backup.",
+  "description": "An Android music player for your own audio, built on Material 3 Expressive, with optional GitHub Gist backup.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

@@ -1,33 +1,32 @@
-import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
-import java.time.Duration
-import java.util.Base64
-import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
-
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
-  alias(libs.plugins.secrets)
-  alias(libs.plugins.google.services)
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.hotsteel.aurapulse"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.aurapulse.kxmpzq"
+    applicationId = "com.hotsteel.aurapulse"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 200
+    versionName = "2.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // GitHub OAuth App client id used for the device-authorization flow.
+    // Provide -Paurapulse.github.clientId=... (or an env var) to enable one-tap browser sign-in.
+    // Personal access tokens always work and need no client id.
+    val githubClientId = (project.findProperty("aurapulse.github.clientId") as String?)
+      ?: System.getenv("AURAPULSE_GITHUB_CLIENT_ID").orEmpty()
+    buildConfigField("String", "GITHUB_CLIENT_ID", "\"$githubClientId\"")
+
+    vectorDrawables.useSupportLibrary = true
   }
 
-  // Do not remove or modify these signingConfigs. They are necessary for building, installing,
-  // and updating Android apps in AI Studio.
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
@@ -47,21 +46,20 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
-      // AI Studio.
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
-      // AI Studio.
+      applicationIdSuffix = ".debug"
+      versionNameSuffix = "-debug"
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
   }
   buildFeatures {
     compose = true
@@ -76,153 +74,50 @@ android {
 
 tasks.withType<Test> {
   failFast = false
-  timeout.set(Duration.ofMinutes(4))
   testLogging {
     events("passed", "failed", "skipped")
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
-secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
-  ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
-}
-
-googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
-
-// A developer-supplied google-services.json always wins. The repository's existing
-// AI Studio configuration is only used when no local configuration was supplied.
-val prepareGoogleServices = tasks.register("prepareGoogleServices") {
-  val localConfig = layout.projectDirectory.file("google-services.json").asFile
-  val bundledConfig = layout.projectDirectory.file("google-services.base64").asFile
-  doLast {
-    if (!localConfig.exists() && bundledConfig.exists()) {
-      localConfig.writeBytes(Base64.getMimeDecoder().decode(bundledConfig.readText()))
-    }
-  }
-}
-tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServices") }
-  .configureEach { dependsOn(prepareGoogleServices) }
-
-// Bundle only the public SHA-1 entries from the Google Services file used for this
-// build. This is an offline snapshot, NOT proof of what is registered in Firebase now.
-// Variant-specific files take precedence in the same order as the Google Services plugin.
-listOf("debug", "release").forEach { buildType ->
-  val capitalized = buildType.replaceFirstChar { it.uppercase() }
-  // Resolve configuration values now so the task action captures no Project or
-  // script objects, and remains compatible with Gradle configuration caching.
-  val packageName = android.defaultConfig.applicationId.orEmpty()
-  val configurationFiles = listOf(
-    layout.projectDirectory.file("src/$buildType/google-services.json").asFile,
-    layout.projectDirectory.file("src/google-services.json").asFile,
-    layout.projectDirectory.file("google-services.json").asFile,
-  )
-  val outputDirectory = layout.buildDirectory.dir("generated/oauth-diagnostics/$buildType").get().asFile
-  val generateDiagnostics = tasks.register("generate${capitalized}OAuthDiagnostics") {
-    dependsOn(prepareGoogleServices)
-    outputs.dir(outputDirectory)
-    // The Google Services file can be replaced locally without a source-code change.
-    outputs.upToDateWhen { false }
-    doLast {
-      val source = configurationFiles.firstOrNull { it.isFile }
-      val data = source?.let { runCatching { JsonSlurper().parse(it) as? Map<*, *> }.getOrNull() }
-      val projectId = (data?.get("project_info") as? Map<*, *>)?.get("project_id") as? String
-      val clients = data?.get("client") as? List<*> ?: emptyList<Any>()
-      val matchingClient = clients.filterIsInstance<Map<*, *>>().firstOrNull { client ->
-        val info = client["client_info"] as? Map<*, *>
-        val androidInfo = info?.get("android_client_info") as? Map<*, *>
-        androidInfo?.get("package_name") == packageName
-      }
-      val fingerprints = ((matchingClient?.get("oauth_client") as? List<*>) ?: emptyList<Any>())
-        .filterIsInstance<Map<*, *>>()
-        .filter { (it["client_type"] as? Number)?.toInt() == 1 }
-        .mapNotNull { it["android_info"] as? Map<*, *> }
-        .filter { it["package_name"] == packageName }
-        .mapNotNull { (it["certificate_hash"] as? String)?.uppercase() }
-        .filter { it.matches(Regex("[0-9A-F]{40}")) }.distinct()
-      val directory = outputDirectory.apply { mkdirs() }
-      directory.resolve("google-oauth-diagnostics.json").writeText(JsonOutput.toJson(mapOf(
-        "packageName" to packageName, "projectId" to projectId, "sha1" to fingerprints,
-      )))
-    }
-  }
-  // AGP 9 disallows Provider instances in the legacy source-set API. Use the
-  // directory as a File and explicitly wire the generating task below.
-  android.sourceSets.getByName(buildType).assets.srcDir(outputDirectory)
-  tasks.matching { it.name.startsWith("merge$capitalized") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(generateDiagnostics) }
-}
-
-// Some unused dependencies are commented out below instead of being removed.
-// This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
-  implementation(platform(libs.firebase.bom))
-  // implementation(libs.accompanist.permissions)
+  implementation(libs.androidx.compose.ui)
+  implementation(libs.androidx.compose.ui.graphics)
+  implementation(libs.androidx.compose.ui.tooling.preview)
+  implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.core.splashscreen)
+  implementation(libs.androidx.lifecycle.runtime.ktx)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.room.runtime)
+  implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.hls)
   implementation(libs.androidx.media3.session)
   implementation(libs.androidx.documentfile)
+  implementation(libs.androidx.palette)
   implementation(libs.coil.compose)
-  implementation(libs.kotlinx.coroutines.play.services)
-  // implementation(libs.androidx.camera.camera2)
-  // implementation(libs.androidx.camera.core)
-  // implementation(libs.androidx.camera.lifecycle)
-  // implementation(libs.androidx.camera.view)
-  implementation(libs.androidx.compose.material.icons.core)
-  implementation(libs.androidx.compose.material.icons.extended)
-  implementation(libs.androidx.compose.material3)
-  implementation(libs.androidx.compose.ui)
-  implementation(libs.androidx.compose.ui.graphics)
-  implementation(libs.androidx.compose.ui.tooling.preview)
-  implementation(libs.androidx.core.ktx)
-  // implementation(libs.androidx.datastore.preferences)
-  implementation(libs.androidx.lifecycle.runtime.compose)
-  implementation(libs.androidx.lifecycle.runtime.ktx)
-  implementation(libs.androidx.lifecycle.viewmodel.compose)
-  // implementation(libs.androidx.navigation.compose)
-  implementation(libs.androidx.room.ktx)
-  implementation(libs.androidx.room.runtime)
-  // implementation(libs.coil.compose)
-  // implementation(libs.converter.moshi)
-  // implementation(libs.firebase.ai)
-  // Uncomment to use Firestore:
-  implementation(libs.firebase.firestore)
-
-  // Uncomment ALL FOUR of the following dependencies together to use Firebase Auth and Google
-  // Sign-In via Credential Manager:
-  implementation(libs.firebase.auth)
-  implementation(libs.androidx.credentials)
-  implementation(libs.androidx.credentials.play.services)
-  implementation(libs.googleid)
-  implementation(libs.play.services.basement)
-  implementation(libs.play.services.auth)
-  // implementation(libs.firebase.appcheck.recaptcha)
-  // implementation(libs.firebase.appcheck.debug)
+  implementation(libs.okhttp)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  // implementation(libs.logging.interceptor)
-  // implementation(libs.moshi.kotlin)
-  implementation(libs.okhttp)
-  // implementation(libs.play.services.location)
-  // implementation(libs.retrofit)
-  testImplementation(libs.androidx.compose.ui.test.junit4)
-  testImplementation(libs.androidx.core)
-  testImplementation(libs.androidx.junit)
+
   testImplementation(libs.junit)
+  testImplementation(libs.org.json)
+  testImplementation(libs.androidx.junit)
+  testImplementation(libs.androidx.test.core)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
-  androidTestImplementation(platform(libs.androidx.compose.bom))
-  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-  androidTestImplementation(libs.androidx.espresso.core)
-  androidTestImplementation(libs.androidx.core)
+  testImplementation(libs.androidx.compose.ui.test.junit4)
+  testImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.junit)
-  androidTestImplementation(libs.androidx.runner)
-  debugImplementation(libs.androidx.compose.ui.test.manifest)
+  androidTestImplementation(libs.androidx.espresso.core)
+  androidTestImplementation(libs.androidx.test.runner)
+  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+  androidTestImplementation(platform(libs.androidx.compose.bom))
   debugImplementation(libs.androidx.compose.ui.tooling)
+  debugImplementation(libs.androidx.compose.ui.test.manifest)
   "ksp"(libs.androidx.room.compiler)
-  // "ksp"(libs.moshi.kotlin.codegen)
 }

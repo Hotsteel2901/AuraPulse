@@ -17,9 +17,13 @@ node_modules/
 local.properties
 .env
 debug.keystore
+/debug.keystore.base64
 *-debug.log
 
-# Local Firebase project configuration and generated debug material
+# Legacy Firebase configuration from the previous app; never used or committed
 app/google-services.json
-/debug.keystore.base64
-/*.jks
+app/google-services.base64
+
+# Release signing material is never committed
+*.jks
+*.keystore

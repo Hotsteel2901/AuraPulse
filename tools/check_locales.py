@@ -6,7 +6,12 @@ import sys
 import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1] / "app/src/main/res"
-locales = ["values", "values-zh-rCN", "values-zh-rTW", "values-zh-rHK", "values-ja", "values-ko", "values-es", "values-de"]
+baseline_folder = "values"
+translated_folders = sorted(
+    folder.name
+    for folder in root.iterdir()
+    if folder.is_dir() and folder.name.startswith("values-") and (folder / "strings.xml").is_file()
+)
 def load(folder):
     tree = ET.parse(root / folder / "strings.xml")
     entries = [(item.attrib["name"], item.text or "") for item in tree.findall("string")]
@@ -17,9 +22,9 @@ def load(folder):
 def arguments(value):
     return sorted(re.findall(r"%\d+\$[sd]", value))
 
-baseline = load(locales[0])
+baseline = load(baseline_folder)
 errors = []
-for locale in locales[1:]:
+for locale in translated_folders:
     values = load(locale)
     missing = baseline.keys() - values.keys()
     extra = values.keys() - baseline.keys()
@@ -31,4 +36,5 @@ for locale in locales[1:]:
 if errors:
     print("\n".join(errors), file=sys.stderr)
     sys.exit(1)
-print(f"Locale check passed: {len(baseline)} strings in {len(locales)} resource sets.")
+folders = ", ".join([baseline_folder] + translated_folders)
+print(f"Locale check passed: {len(baseline)} strings in {len(translated_folders) + 1} resource sets ({folders}).")

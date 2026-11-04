@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AuraPulse" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/aura_window</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="windowSplashScreenAnimationDuration">320</item>
+        <item name="postSplashScreenTheme">@style/Theme.AuraPulse.Main</item>
+    </style>
+
+    <style name="Theme.AuraPulse.Main" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/aura_window</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

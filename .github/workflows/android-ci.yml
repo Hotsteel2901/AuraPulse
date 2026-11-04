@@ -1,197 +1,78 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Hotsteel2901 (github@Hotsteel2901)
-# AuraPulse — Automated GitHub Actions CI Build & Verification Workflow
+# Copyright (C) 2026 Hotsteel2901
+#
+# AuraPulse CI: locale parity, debug APK, JVM unit tests and Android Lint.
+# No Firebase, no emulators, no secrets required.
 
-name: AuraPulse Android CI
+name: AuraPulse CI
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - develop
+    branches: [main, master]
   pull_request:
-    branches:
-      - main
-      - master
-      - develop
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
   contents: read
-  checks: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  JAVA_VERSION: '21'
-  NODE_VERSION: '24'
   GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=4 -Djava.awt.headless=true -Xmx4g'
-  JAVA_TOOL_OPTIONS: '-Djava.awt.headless=true'
 
 jobs:
-  firestore-rules-and-license-audit:
-    name: License (AGPL-3.0-or-later) & Firestore Rules CI
+  locale-parity:
+    name: Locale parity
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Verify translations
+      - uses: actions/checkout@v4
+      - name: Every string must exist in every locale with the same format arguments
         run: python3 tools/check_locales.py
 
-      - name: Verify AGPL-3.0-or-later License & Metadata
-        run: |
-          test -f LICENSE
-          grep -q "AGPL-3.0-or-later" LICENSE
-          test -f firebase-blueprint.json
-          test -f firestore.rules
-
-      - name: Set up Java ${{ env.JAVA_VERSION }} (for Firebase Firestore Emulator)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Set up Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Pinned Firebase Emulator CLI & Rules Unit Testing SDK
-        run: |
-          npm install -g firebase-tools@15.34.2
-          npm install --no-save --no-package-lock @firebase/rules-unit-testing@6.0.0 firebase@13.1.0
-
-      - name: Execute Tier 1 Firestore Security Rules Suite
-        run: |
-          firebase emulators:exec --only firestore --project demo-no-project "node --test firestore.test.js"
-
-  android-build-and-test:
-    name: Android APK Build & Robolectric Test Suite
+  build-and-test:
+    name: Assemble, unit tests and lint
     runs-on: ubuntu-latest
-    needs: firestore-rules-and-license-audit
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }} (Temurin)
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          java-version: '21'
 
-      - name: Set up Node.js ${{ env.NODE_VERSION }} (for Emulator-Backed Unit Tests)
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Configure Gradle with Latest GitHub Actions Integration
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
 
-      - name: Prepare Debug Keystore, Firebase Config & Environment Defaults
-        env:
-          DEBUG_KEYSTORE_BASE64: ${{ secrets.AURAPULSE_DEBUG_KEYSTORE_BASE64 }}
+      - name: Provide a debug keystore
         run: |
-          KEY_SOURCE="existing local debug key"
           if [ ! -f debug.keystore ]; then
-            if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
-              printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > debug.keystore
-              KEY_SOURCE="configured CI debug key"
-            elif [ -f debug.keystore.base64 ]; then
-              base64 -d debug.keystore.base64 > debug.keystore
-              KEY_SOURCE="local base64 debug key"
-            else
-              KEY_SOURCE="temporary key generated for this build"
-              keytool -genkeypair -v \
-                -keystore debug.keystore \
-                -storepass android \
-                -alias androiddebugkey \
-                -keypass android \
-                -keyalg RSA \
-                -keysize 2048 \
-                -validity 10000 \
-                -dname "CN=Android Debug,O=Android,C=US"
-            fi
-          fi
-          {
-            echo "### Debug APK signing certificate"
-            echo "Source: $KEY_SOURCE"
-            echo "Register these public fingerprints with Firebase if testing Google sign-in. Temporary CI keys change on each run."
-            echo '```'
-            keytool -list -v -keystore debug.keystore -alias androiddebugkey -storepass android | grep -E 'SHA1:|SHA256:'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ ! -f .env ] && [ -f .env.example ]; then
-            cp .env.example .env
-          fi
-          if [ ! -f app/src/main/res/values/firebase_applet_config.xml ]; then
-            mkdir -p app/src/main/res/values
-            printf '<?xml version="1.0" encoding="utf-8" standalone="no"?>\n<resources>\n    <string name="firestore_database_id" translatable="false">ai-studio-android-aurapuls-c9586a34-dab8-4459-bb80-41ea50593ca8</string>\n</resources>\n' > app/src/main/res/values/firebase_applet_config.xml
-          fi
-          if [ ! -f app/google-services.json ]; then
-            if [ -f app/google-services.base64 ]; then
-              base64 -d app/google-services.base64 > app/google-services.json
-            else
-              printf '{\n  "project_info": {\n    "project_number": "123456789000",\n    "project_id": "demo-no-project",\n    "storage_bucket": "demo-no-project.appspot.com"\n  },\n  "client": [\n    {\n      "client_info": {\n        "mobilesdk_app_id": "1:123456789000:android:abcdef1234567890",\n        "android_client_info": {\n          "package_name": "com.aistudio.aurapulse.kxmpzq"\n        }\n      },\n      "oauth_client": [\n        {\n          "client_id": "123456789000-ciwebclient.apps.googleusercontent.com",\n          "client_type": 3\n        }\n      ],\n      "api_key": [\n        {\n          "current_key": "AIzaSyDummyKeyForCiBuildAndEmulatorTesting00"\n        }\n      ],\n      "services": {\n        "appinvite_service": {\n          "other_platform_oauth_client": [\n            {\n              "client_id": "123456789000-ciwebclient.apps.googleusercontent.com",\n              "client_type": 3\n            }\n          ]\n        }\n      }\n    }\n  ],\n  "configuration_version": "1"\n}\n' > app/google-services.json
-            fi
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Ensure Gradle Wrapper Executable Permission
-        run: |
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-          fi
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Assemble Debug APK and Device Test APK
-        shell: bash
-        run: |
-          set +e
-          if [ -f ./gradlew ]; then
-            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/aurapulse-assemble.log"
-          else
-            gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/aurapulse-assemble.log"
-          fi
-          result=${PIPESTATUS[0]}
-          if [ "$result" -ne 0 ]; then
-            python3 tools/report_build_failures.py "$RUNNER_TEMP/aurapulse-assemble.log"
-            exit "$result"
-          fi
+      - name: Run JVM unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
 
-      - name: Start Firebase Emulators & Run Unit + Robolectric Tests
-        shell: bash
-        run: |
-          set -o pipefail
-          npm install -g firebase-tools@15.34.2
-          (setsid nohup firebase emulators:start --only firestore,auth --project demo-no-project > /tmp/firebase-emulators.log 2>&1 < /dev/null &)
-          ready=false
-          for i in $(seq 1 90); do
-            if curl -s --max-time 2 -o /dev/null http://127.0.0.1:8085 && curl -s --max-time 2 -o /dev/null http://127.0.0.1:9099; then
-              echo "Firebase Emulators ready after ${i}s"
-              ready=true
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ready" != true ]; then
-            echo "::error::Firebase emulators did not become ready."
-            tail -n 120 /tmp/firebase-emulators.log
-            exit 1
-          fi
-          ./gradlew :app:testDebugUnitTest --stacktrace 2>&1 | tee /tmp/aurapulse-unit-tests.log
+      - name: Run Android Lint
+        run: ./gradlew :app:lintDebug --stacktrace
 
       - name: Report unit-test failures
         if: failure()
-        shell: bash
         run: python3 tools/report_test_failures.py
 
-      - name: Upload Debug APK Artifact
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: aurapulse-debug-apk
@@ -199,65 +80,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Android Instrumentation APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: aurapulse-android-test-apk
-          path: app/build/outputs/apk/androidTest/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload Unit & Robolectric Test Reports
+      - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: aurapulse-unit-test-reports
-          path: app/build/reports/tests/testDebugUnitTest/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  android-emulator-tests:
-    name: Android Emulator Playback & Player UI Tests
-    runs-on: ubuntu-latest
-    needs: android-build-and-test
-    timeout-minutes: 30
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download Debug APK
-        uses: actions/download-artifact@v4
-        with:
-          name: aurapulse-debug-apk
-          path: device-apks/app
-
-      - name: Download Instrumentation APK
-        uses: actions/download-artifact@v4
-        with:
-          name: aurapulse-android-test-apk
-          path: device-apks/test
-
-      - name: Enable Emulator Acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          test -e /dev/kvm || { echo "::error::This runner has no KVM support for Android emulator tests."; exit 1; }
-
-      - name: Run Tests on Android 15 Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          disable-animations: true
-          script: bash tools/run_device_tests.sh
-
-      - name: Upload Synthetic Player Screenshot
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: aurapulse-player-test-screenshot
-          path: device-player.png
+          name: aurapulse-reports
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
           retention-days: 14

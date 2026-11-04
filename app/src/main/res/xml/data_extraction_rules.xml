@@ -2,8 +2,10 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="language.xml" />
+        <include domain="sharedpref" path="aurapulse_settings.xml" />
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="language.xml" />
+        <include domain="sharedpref" path="aurapulse_settings.xml" />
     </device-transfer>
 </data-extraction-rules>

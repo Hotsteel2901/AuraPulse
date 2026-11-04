@@ -1,9 +1,24 @@
 # Security and data boundaries
 
-- `users/{uid}/backups/library` is readable, writable and deletable only by the matching authenticated Firebase UID. Rules restrict document ID, fields, schema version, string size and server timestamp. List access is denied.
-- Backup contains playlists and remote audio URLs only. It never contains `content://` URIs, local files, downloaded paths or Android URI grants. URLs may themselves contain sensitive query parameters; the UI warns users before backup.
-- Backups are explicit snapshots, not automatic synchronization. Restore validates the schema, URL schemes, identifiers, bounds and duplicates before a database transaction; newer local playlists are retained.
-- Custom JSON search endpoints must be HTTPS and cannot contain URL userinfo. No authentication headers or tokens are stored by the new source configuration. HTTP is permitted for user-supplied audio and radio streams only because many stations do not offer HTTPS; the interface warns that these streams are unencrypted.
-- Google login reports success only after Firebase verifies the Google ID token. No email-only or profile-lookup fallback is treated as authentication.
-- The original Firestore collections and their rules remain for compatibility, but the new UI does not read or write them. The old local database is not destroyed and its fabricated catalog is not imported.
-- Local files are accessed through persisted Android document grants. Removing a track from AuraPulse never deletes the original file. App-owned downloaded copies are removed only from the app’s private downloads directory.
+- AuraPulse has no backend and no Firebase project. The only endpoints it contacts are
+  `itunes.apple.com`, `all.api.radio-browser.info`, user-configured HTTPS JSON sources,
+  user-supplied audio/stream URLs and `api.github.com`.
+- A GitHub token is stored through `SecureStore`: AES/GCM with a key that never leaves the Android
+  Keystore. The plaintext token is not written to SharedPreferences, Room, logs or backups. Signing
+  out clears the stored ciphertext.
+- The requested OAuth scope is `gist read:user`. Nothing else is asked for, and no token is sent
+  anywhere except `api.github.com`.
+- Gist backups contain track metadata, playlists, favourites and remote URLs only. They never contain
+  `content://` URIs, local file paths, downloaded copies or Android document grants. A backup can
+  reveal which stations or links a person listens to, so pushing is always an explicit action.
+- Restore validates the schema, field types, URL schemes and list bounds before touching Room, and
+  merges by identifier plus `updatedAt` instead of wiping local data. A changed Gist revision is
+  reported as a conflict rather than silently overwritten.
+- Custom JSON search endpoints must use HTTPS and cannot contain URL userinfo. No authentication
+  header is configurable, so no credential can be smuggled into a source template.
+- Plain HTTP is accepted only for user-supplied audio and radio streams, because many stations do not
+  offer TLS. The interface states that such streams are unencrypted.
+- Local files are opened through persisted Android document grants. Removing a track from AuraPulse
+  never deletes the original document; app-owned downloads are deleted only from the app's private
+  download directory.
+- There is no analytics, crash reporting, advertising or device-fingerprinting code in the app.
