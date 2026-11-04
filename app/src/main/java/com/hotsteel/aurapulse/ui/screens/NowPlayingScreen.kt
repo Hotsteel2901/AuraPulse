@@ -1098,16 +1098,16 @@ private fun TimerPanel(vm: AuraViewModel, sleep: SleepState) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
       listOf(15, 30, 45).forEach { minutes ->
         FilledTonalButton(onClick = { vm.startSleep(minutes) }, modifier = Modifier.weight(1f)) {
-          Text("$minutes ${stringResource(R.string.minutes_short)}")
+          Text(stringResource(R.string.minutes_short, minutes))
         }
       }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
       FilledTonalButton(onClick = { vm.startSleep(60) }, modifier = Modifier.weight(1f)) {
-        Text("60 ${stringResource(R.string.minutes_short)}")
+        Text(stringResource(R.string.minutes_short, 60))
       }
       FilledTonalButton(onClick = { vm.startSleep(90) }, modifier = Modifier.weight(1f)) {
-        Text("90 ${stringResource(R.string.minutes_short)}")
+        Text(stringResource(R.string.minutes_short, 90))
       }
     }
     FilledTonalButton(onClick = vm::sleepAtTrackEnd, modifier = Modifier.fillMaxWidth()) {
