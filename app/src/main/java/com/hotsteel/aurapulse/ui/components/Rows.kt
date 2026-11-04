@@ -327,6 +327,8 @@ fun MiniPlayer(
   val state by vm.playback.collectAsStateWithLifecycle()
   val track = state.track ?: return
   val haptics = LocalHapticFeedback.current
+  val settings by vm.settings.collectAsStateWithLifecycle()
+  val hapticsOn = settings.haptics
   val interaction = remember { MutableInteractionSource() }
   val scale = rememberPressScale(interaction, 0.98f)
   Surface(
@@ -354,7 +356,7 @@ fun MiniPlayer(
             overflow = TextOverflow.Ellipsis,
           )
         }
-        IconButton(onClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); vm.toggle() }) {
+        IconButton(onClick = { if (hapticsOn) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); vm.toggle() }) {
           Icon(
             if (state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = if (state.playing) "Pause" else "Play",

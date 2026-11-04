@@ -152,6 +152,7 @@ fun NowPlayingScreen(
   val enhancements by vm.enhancements.collectAsStateWithLifecycle()
   val sleep by vm.sleep.collectAsStateWithLifecycle()
   val lyrics by vm.lyrics.collectAsStateWithLifecycle()
+  val settings by vm.settings.collectAsStateWithLifecycle()
   val haptics = LocalHapticFeedback.current
 
   var panel by remember { mutableStateOf(PlayerPanel.NONE) }
@@ -245,14 +246,14 @@ fun NowPlayingScreen(
           )
         }
 
-        TransportRow(vm, playback.playing, playback.shuffle, playback.repeat)
+        TransportRow(vm, playback.playing, playback.shuffle, playback.repeat, settings.haptics)
         Spacer(Modifier.height(10.dp))
         PanelChips(
           panel = panel,
           sleepActive = sleep.active,
           hasLyrics = lyrics != null,
           onPick = { chosen ->
-            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+            if (settings.haptics) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
             panel = if (panel == chosen) PlayerPanel.NONE else chosen
           },
         )
@@ -484,14 +485,17 @@ private fun WavySeekBar(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, repeat: Int) {
+private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, repeat: Int, on: Boolean) {
   val haptics = LocalHapticFeedback.current
   Row(
     Modifier.fillMaxWidth(),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.SpaceBetween,
   ) {
-    IconButton(onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); vm.toggleShuffle() }) {
+    IconButton(onClick = {
+      if (on) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+      vm.toggleShuffle()
+    }) {
       Icon(
         Icons.Default.Shuffle,
         contentDescription = stringResource(R.string.shuffle),
@@ -501,11 +505,14 @@ private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, 
     IconButton(onClick = vm::previous, modifier = Modifier.size(52.dp)) {
       Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.previous_track), modifier = Modifier.size(32.dp))
     }
-    PlayPauseButton(vm, playing)
+    PlayPauseButton(vm, playing, on)
     IconButton(onClick = vm::next, modifier = Modifier.size(52.dp)) {
       Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next_track), modifier = Modifier.size(32.dp))
     }
-    IconButton(onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); vm.cycleRepeat() }) {
+    IconButton(onClick = {
+      if (on) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+      vm.cycleRepeat()
+    }) {
       Icon(
         if (repeat == androidx.media3.common.Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
         contentDescription = when (repeat) {
@@ -522,7 +529,7 @@ private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, 
 }
 
 @Composable
-private fun PlayPauseButton(vm: AuraViewModel, playing: Boolean) {
+private fun PlayPauseButton(vm: AuraViewModel, playing: Boolean, on: Boolean) {
   val haptics = LocalHapticFeedback.current
   val interaction = remember { MutableInteractionSource() }
   val scale = rememberPressScale(interaction, 0.9f)
@@ -541,7 +548,7 @@ private fun PlayPauseButton(vm: AuraViewModel, playing: Boolean) {
     tonalElevation = 6.dp,
     shadowElevation = 10.dp,
     onClick = {
-      haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+      if (on) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
       vm.toggle()
     },
     interactionSource = interaction,

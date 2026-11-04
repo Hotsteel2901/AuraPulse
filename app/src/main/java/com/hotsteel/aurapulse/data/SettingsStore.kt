@@ -25,7 +25,6 @@ data class AppSettings(
   val resumeOnLaunch: Boolean = true,
   val librarySort: TrackSort = TrackSort.ADDED,
   val libraryFilter: LibraryFilter = LibraryFilter.ALL,
-  val libraryGrid: Boolean = false,
   val onboardingDone: Boolean = false,
   val language: String = "system",
   val searchHistory: List<String> = emptyList(),
@@ -70,7 +69,6 @@ class SettingsStore(context: Context) {
     resumeOnLaunch = prefs.getBoolean("resume", true),
     librarySort = enum(prefs.getString("sort", null), TrackSort.ADDED),
     libraryFilter = enum(prefs.getString("filter", null), LibraryFilter.ALL),
-    libraryGrid = prefs.getBoolean("grid", false),
     onboardingDone = prefs.getBoolean("onboarding", false),
     language = prefs.getString("language", "system") ?: "system",
     searchHistory = prefs.getString("search_history", null)
@@ -89,7 +87,6 @@ class SettingsStore(context: Context) {
       putBoolean("resume", settings.resumeOnLaunch)
       putString("sort", settings.librarySort.name)
       putString("filter", settings.libraryFilter.name)
-      putBoolean("grid", settings.libraryGrid)
       putBoolean("onboarding", settings.onboardingDone)
       putString("language", settings.language)
       putString("search_history", settings.searchHistory.joinToString("\u0001"))
