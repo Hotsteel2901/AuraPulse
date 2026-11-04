@@ -8,10 +8,12 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.hotsteel.aurapulse.AuraApp
 import com.hotsteel.aurapulse.MainActivity
+import com.hotsteel.aurapulse.R
 import com.hotsteel.aurapulse.widget.NowPlayingWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +40,10 @@ class PlaybackService : MediaSessionService() {
   private var listenedMs: Long = 0
   private var lastSave = 0L
   private var ticker: Job? = null
+
+  private companion object {
+    const val NOTIFICATION_ID = 1001
+  }
 
   override fun onCreate() {
     super.onCreate()
@@ -93,6 +99,15 @@ class PlaybackService : MediaSessionService() {
     val intent = Intent(this, MainActivity::class.java)
     val pending = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     session = MediaSession.Builder(this, exo).setSessionActivity(pending).build()
+    // Reuse the app's low-importance channel so the notification obeys the user's
+    // channel settings instead of the library's default channel.
+    setMediaNotificationProvider(
+      DefaultMediaNotificationProvider.Builder(this)
+        .setChannelId(AuraApp.CHANNEL_ID)
+        .setChannelName(R.string.notification_channel_playback)
+        .setNotificationId(NOTIFICATION_ID)
+        .build(),
+    )
     startTicker()
   }
 
@@ -120,8 +135,10 @@ class PlaybackService : MediaSessionService() {
           exo.pause()
           SleepTimer.cancel()
         }
-        if (sleep.fading && sleep.endsAt == null) {
-          exo.volume = PlaybackEnhancements.state.value.volume
+        // A cancelled timer (or a finished fade) must never leave the player quiet.
+        if (sleep.endsAt == null && !sleep.fading) {
+          val target = PlaybackEnhancements.state.value.volume
+          if (kotlin.math.abs(exo.volume - target) > 0.001f) exo.volume = target
         }
         val loop = PlaybackEnhancements.loopTarget(exo.currentPosition)
         if (loop != null && exo.isPlaying) exo.seekTo(loop)
@@ -159,11 +176,11 @@ class PlaybackService : MediaSessionService() {
     listeningSince = if (player?.isPlaying == true) System.currentTimeMillis() else 0
     listenedMs += delta
     if (delta > 1_000) {
-      scope.launch(Dispatchers.IO) {
-        val duration = player?.duration?.takeIf { it > 0 } ?: 0
-        val completed = duration > 0 && (player?.currentPosition ?: 0) >= duration - 3000
-        AuraApp.container.library.recordPlay(id, delta, completed)
-      }
+      // Player state is only read on this (main) thread; the database write happens off it.
+      val duration = player?.duration?.takeIf { it > 0 } ?: 0
+      val position = player?.currentPosition ?: 0
+      val completed = duration > 0 && position >= duration - 3000
+      scope.launch(Dispatchers.IO) { AuraApp.container.library.recordPlay(id, delta, completed) }
     }
   }
 
