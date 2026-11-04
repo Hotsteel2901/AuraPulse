@@ -1,7 +1,5 @@
 package com.example.data.model
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.IgnoreExtraProperties
@@ -63,32 +61,9 @@ data class SyncState(
   val positionMs: Long = 0L,
   val isPlaying: Boolean = false,
   val activeService: String = "AURA_HIFI",
-  val audioQualityBadge: String = "24-bit/192kHz FLAC",
-  val activeSourceName: String = "Aura Hi-Res Core",
+  val audioQualityBadge: String = "Unknown",
+  val activeSourceName: String = "Unknown",
   val regionCode: String = "GLOBAL",
   @ServerTimestamp val createdAt: Timestamp? = null,
   @ServerTimestamp val updatedAt: Timestamp? = null,
-)
-
-@Entity(tableName = "offline_tracks")
-data class OfflineTrackEntity(
-  @PrimaryKey val trackId: String,
-  val title: String,
-  val artist: String,
-  val album: String,
-  val durationMs: Long,
-  val bitDepth: Int,
-  val sampleRateKhz: Double,
-  val bitrateKbps: Int,
-  val codec: String,
-  val accentHex: String,
-  val secondaryHex: String,
-  val sourceProvider: String,
-  val externalUri: String,
-  val baseFreqHz: Double,
-  val harmonicRatio: Double,
-  val isDownloadedOffline: Boolean,
-  val offlineSizeMb: Double,
-  val localPcmPath: String?,
-  val downloadedAtEpochMs: Long,
 )

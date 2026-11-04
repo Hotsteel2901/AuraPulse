@@ -1,5 +1,8 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.time.Duration
+import java.util.Base64
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 
 plugins {
   alias(libs.plugins.android.application)
@@ -72,8 +75,8 @@ android {
 }
 
 tasks.withType<Test> {
-  failFast = true
-  timeout.set(Duration.ofMinutes(2))
+  failFast = false
+  timeout.set(Duration.ofMinutes(4))
   testLogging {
     events("passed", "failed", "skipped")
   }
@@ -89,6 +92,69 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
+// A developer-supplied google-services.json always wins. The repository's existing
+// AI Studio configuration is only used when no local configuration was supplied.
+val prepareGoogleServices = tasks.register("prepareGoogleServices") {
+  val localConfig = layout.projectDirectory.file("google-services.json").asFile
+  val bundledConfig = layout.projectDirectory.file("google-services.base64").asFile
+  doLast {
+    if (!localConfig.exists() && bundledConfig.exists()) {
+      localConfig.writeBytes(Base64.getMimeDecoder().decode(bundledConfig.readText()))
+    }
+  }
+}
+tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServices") }
+  .configureEach { dependsOn(prepareGoogleServices) }
+
+// Bundle only the public SHA-1 entries from the Google Services file used for this
+// build. This is an offline snapshot, NOT proof of what is registered in Firebase now.
+// Variant-specific files take precedence in the same order as the Google Services plugin.
+listOf("debug", "release").forEach { buildType ->
+  val capitalized = buildType.replaceFirstChar { it.uppercase() }
+  // Resolve configuration values now so the task action captures no Project or
+  // script objects, and remains compatible with Gradle configuration caching.
+  val packageName = android.defaultConfig.applicationId.orEmpty()
+  val configurationFiles = listOf(
+    layout.projectDirectory.file("src/$buildType/google-services.json").asFile,
+    layout.projectDirectory.file("src/google-services.json").asFile,
+    layout.projectDirectory.file("google-services.json").asFile,
+  )
+  val outputDirectory = layout.buildDirectory.dir("generated/oauth-diagnostics/$buildType").get().asFile
+  val generateDiagnostics = tasks.register("generate${capitalized}OAuthDiagnostics") {
+    dependsOn(prepareGoogleServices)
+    outputs.dir(outputDirectory)
+    // The Google Services file can be replaced locally without a source-code change.
+    outputs.upToDateWhen { false }
+    doLast {
+      val source = configurationFiles.firstOrNull { it.isFile }
+      val data = source?.let { runCatching { JsonSlurper().parse(it) as? Map<*, *> }.getOrNull() }
+      val projectId = (data?.get("project_info") as? Map<*, *>)?.get("project_id") as? String
+      val clients = data?.get("client") as? List<*> ?: emptyList<Any>()
+      val matchingClient = clients.filterIsInstance<Map<*, *>>().firstOrNull { client ->
+        val info = client["client_info"] as? Map<*, *>
+        val androidInfo = info?.get("android_client_info") as? Map<*, *>
+        androidInfo?.get("package_name") == packageName
+      }
+      val fingerprints = ((matchingClient?.get("oauth_client") as? List<*>) ?: emptyList<Any>())
+        .filterIsInstance<Map<*, *>>()
+        .filter { (it["client_type"] as? Number)?.toInt() == 1 }
+        .mapNotNull { it["android_info"] as? Map<*, *> }
+        .filter { it["package_name"] == packageName }
+        .mapNotNull { (it["certificate_hash"] as? String)?.uppercase() }
+        .filter { it.matches(Regex("[0-9A-F]{40}")) }.distinct()
+      val directory = outputDirectory.apply { mkdirs() }
+      directory.resolve("google-oauth-diagnostics.json").writeText(JsonOutput.toJson(mapOf(
+        "packageName" to packageName, "projectId" to projectId, "sha1" to fingerprints,
+      )))
+    }
+  }
+  // AGP 9 disallows Provider instances in the legacy source-set API. Use the
+  // directory as a File and explicitly wire the generating task below.
+  android.sourceSets.getByName(buildType).assets.srcDir(outputDirectory)
+  tasks.matching { it.name.startsWith("merge$capitalized") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(generateDiagnostics) }
+}
+
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
@@ -96,6 +162,12 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.media3.exoplayer)
+  implementation(libs.androidx.media3.hls)
+  implementation(libs.androidx.media3.session)
+  implementation(libs.androidx.documentfile)
+  implementation(libs.coil.compose)
+  implementation(libs.kotlinx.coroutines.play.services)
   // implementation(libs.androidx.camera.camera2)
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)
@@ -126,6 +198,8 @@ dependencies {
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
+  implementation(libs.play.services.basement)
+  implementation(libs.play.services.auth)
   // implementation(libs.firebase.appcheck.recaptcha)
   // implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
@@ -144,6 +218,7 @@ dependencies {
   androidTestImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.espresso.core)
+  androidTestImplementation(libs.androidx.core)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)

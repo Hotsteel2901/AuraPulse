@@ -215,3 +215,24 @@ test("SoundProfile and SyncState: owner can create and update valid documents", 
       })
   );
 });
+
+test("library backup: only the authenticated owner can read or write a bounded snapshot", async () => {
+  const alice = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bob = testEnv.authenticatedContext(BOB_UID).firestore();
+  const guest = testEnv.unauthenticatedContext().firestore();
+  const aliceBackup = alice.collection("users").doc(ALICE_UID).collection("backups").doc("library");
+  const path = (db) => db.collection("users").doc(ALICE_UID).collection("backups").doc("library");
+  // The compat SDK used elsewhere in this suite accepts its own FieldValue sentinel.
+  const firebase = require("firebase/compat/app");
+  require("firebase/compat/firestore");
+  const payload = { userId: ALICE_UID, schemaVersion: 1, data: '{"version":1,"tracks":[],"playlists":[]}', updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  await assertSucceeds(aliceBackup.set(payload));
+  await assertSucceeds(aliceBackup.get());
+  await assertFails(path(bob).get());
+  await assertFails(path(guest).get());
+  await assertFails(path(bob).set({ ...payload, userId: BOB_UID }));
+  await assertFails(aliceBackup.set({ ...payload, extra: true }));
+  await assertFails(aliceBackup.set({ ...payload, data: "x".repeat(700001) }));
+  await assertFails(alice.collection("users").doc(ALICE_UID).collection("backups").doc("other").set(payload));
+  await assertFails(alice.collection("users").doc(ALICE_UID).collection("backups").get());
+});
