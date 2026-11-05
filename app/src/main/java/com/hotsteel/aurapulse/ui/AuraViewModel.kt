@@ -111,7 +111,7 @@ data class LyricsBundle(val trackId: String, val lyrics: Lyrics, val offsetMs: I
  *   headless tooling pass false so the UI can be composed without a playback
  *   service; the screens simply stay in their idle state.
  */
-class AuraViewModel(
+class AuraViewModel @JvmOverloads constructor(
   application: Application,
   connectToService: Boolean = true,
 ) : AndroidViewModel(application) {

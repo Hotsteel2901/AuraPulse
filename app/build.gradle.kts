@@ -12,8 +12,8 @@ android {
     applicationId = "com.hotsteel.aurapulse"
     minSdk = 24
     targetSdk = 36
-    versionCode = 201
-    versionName = "2.0.1"
+    versionCode = 202
+    versionName = "2.0.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -65,7 +65,12 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all { it.maxHeapSize = "2g" }
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true

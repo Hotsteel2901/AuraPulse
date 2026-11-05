@@ -394,4 +394,10 @@
     <string name="downloads_clear_body">所有已下载副本都会从应用存储中删除，线上原始来源不受影响。</string>
     <string name="favorite_add">加入收藏</string>
     <string name="favorite_remove">取消收藏</string>
+    <string name="crash_title">AuraPulse 上次异常退出</string>
+    <string name="crash_hint">这是上一次启动的崩溃记录。复制后发回，即可定位具体原因。</string>
+    <string name="crash_copy">复制记录</string>
+    <string name="crash_copied">已复制</string>
+    <string name="crash_safe_mode">以安全模式启动</string>
+    <string name="crash_normal_start">清除并正常启动</string>
 </resources>

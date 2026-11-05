@@ -35,7 +35,7 @@ data class AppSettings(
  * copy-on-write so Compose can observe it without a database round trip.
  */
 class SettingsStore(context: Context) {
-  private val prefs = context.applicationContext.getSharedPreferences("aurapulse_settings", Context.MODE_PRIVATE)
+  private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
   private val mutable = MutableStateFlow(read())
   val state: StateFlow<AppSettings> = mutable.asStateFlow()
 
@@ -95,4 +95,8 @@ class SettingsStore(context: Context) {
 
   private inline fun <reified T : Enum<T>> enum(name: String?, fallback: T): T =
     name?.let { value -> enumValues<T>().firstOrNull { it.name == value } } ?: fallback
+
+  companion object {
+    const val PREFS = "aurapulse_settings"
+  }
 }

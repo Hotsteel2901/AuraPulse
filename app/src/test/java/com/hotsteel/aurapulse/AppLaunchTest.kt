@@ -1,52 +1,50 @@
 package com.hotsteel.aurapulse
 
-import android.os.Looper
+import android.app.Application
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import com.hotsteel.aurapulse.ui.AuraRoot
 import com.hotsteel.aurapulse.ui.AuraViewModel
 import org.junit.Assert.assertNotNull
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * Boots the real application and the first screen the launcher shows.
+ * Boots the real application and the onboarding screen a fresh install shows.
  *
- * The onboarding screen is composed because a fresh install lands there, which
- * is exactly the state the app crashed in when the emphasized typography scaled
- * an unspecified letter spacing. Per-screen composition is covered separately
- * in [ScreenComposeTest], which freezes the animation clock.
- *
- * The ViewModel is created without a playback service: Robolectric cannot bind
- * a real MediaSessionService, and the UI is expected to stay usable (idle) when
- * the service is unavailable anyway.
+ * The clock is frozen because the aura backdrop animates forever; driving the
+ * looper with idle() spins until Robolectric's trace buffer exhausts the heap.
+ * Per-screen composition is covered in [ScreenComposeTest], and the reflective
+ * ViewModel contract in [com.hotsteel.aurapulse.ui.ViewModelCreationTest].
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xhdpi")
 class AppLaunchTest {
 
+  @get:Rule
+  val compose = createAndroidComposeRule<ComponentActivity>()
+
   @Test
   fun applicationStarts() {
     val app = ApplicationProvider.getApplicationContext<AuraApp>()
     assertNotNull(app.container)
+    assertNotNull(app.getSystemService(Application.NOTIFICATION_SERVICE))
   }
 
   @Test
-  fun firstScreenReachesFirstFrame() {
+  fun onboardingReachesFirstFrame() {
+    compose.mainClock.autoAdvance = false
     val app = ApplicationProvider.getApplicationContext<AuraApp>()
-    val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
-    val activity = controller.get()
+    app.container.settings.update { it.copy(onboardingDone = false) }
     val viewModel = AuraViewModel(app, connectToService = false)
-    activity.setContent {
+    compose.setContent {
       AuraRoot(vm = viewModel, onChangeLanguage = {}, onChangeDarkTheme = {})
     }
-    shadowOf(Looper.getMainLooper()).idle()
-    assertNotNull(activity.window.decorView)
-    controller.pause().stop().destroy()
+    compose.mainClock.advanceTimeBy(64)
+    assertNotNull(compose.activity.window.decorView)
   }
 }

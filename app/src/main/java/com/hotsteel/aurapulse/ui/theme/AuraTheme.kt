@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -226,7 +227,12 @@ fun auraShapes(scale: Float): Shapes {
 }
 
 @Composable
-fun AuraTheme(settings: AppSettings, systemDark: Boolean, content: @Composable () -> Unit) {
+fun AuraTheme(
+  settings: AppSettings,
+  systemDark: Boolean,
+  safeMode: Boolean = false,
+  content: @Composable () -> Unit,
+) {
   val dark = when (settings.theme) {
     ThemeMode.LIGHT -> false
     ThemeMode.DARK, ThemeMode.BLACK -> true
@@ -241,11 +247,19 @@ fun AuraTheme(settings: AppSettings, systemDark: Boolean, content: @Composable (
         LocalContext.current.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
       ) == 0f) MotionScheme.standard() else MotionScheme.expressive()
   }
-  MaterialExpressiveTheme(
-    colorScheme = scheme,
-    motionScheme = motion,
-    shapes = auraShapes(settings.cornerScale),
-    typography = buildTypography(),
-    content = content,
-  )
+  val shapes = auraShapes(settings.cornerScale)
+  val typography = buildTypography()
+  if (safeMode) {
+    // Recovery path: the plain theme still renders every screen and keeps
+    // MotionScheme.standard(), which isolates expressive-only failures.
+    MaterialTheme(colorScheme = scheme, shapes = shapes, typography = typography, content = content)
+  } else {
+    MaterialExpressiveTheme(
+      colorScheme = scheme,
+      motionScheme = motion,
+      shapes = shapes,
+      typography = typography,
+      content = content,
+    )
+  }
 }

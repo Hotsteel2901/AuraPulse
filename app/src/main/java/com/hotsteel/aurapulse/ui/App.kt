@@ -88,6 +88,7 @@ fun AuraRoot(
   onChangeLanguage: (String) -> Unit,
   onChangeDarkTheme: (Boolean) -> Unit = {},
   initialRoute: Route = Route.Library,
+  safeMode: Boolean = false,
 ) {
   val settings by vm.settings.collectAsStateWithLifecycle()
   val playback by vm.playback.collectAsStateWithLifecycle()
@@ -95,9 +96,9 @@ fun AuraRoot(
   val snackbar = remember { SnackbarHostState() }
   val stack = remember { mutableStateListOf(initialRoute) }
   var playerOpen by rememberSaveable { mutableStateOf(false) }
-  var onboarded by rememberSaveable { mutableStateOf(settings.onboardingDone) }
+  var onboarded by rememberSaveable { mutableStateOf(settings.onboardingDone || safeMode) }
 
-  AuraTheme(settings = settings, systemDark = isSystemInDarkTheme()) {
+  AuraTheme(settings = settings, systemDark = isSystemInDarkTheme(), safeMode = safeMode) {
     val darkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     LaunchedEffect(darkSurface) { onChangeDarkTheme(darkSurface) }
     LaunchedEffect(Unit) {
