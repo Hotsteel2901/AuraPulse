@@ -106,7 +106,15 @@ data class DeviceFlow(val code: DeviceCode, val waiting: Boolean = true)
 
 data class LyricsBundle(val trackId: String, val lyrics: Lyrics, val offsetMs: Int)
 
-class AuraViewModel(application: Application) : AndroidViewModel(application) {
+/**
+ * @param connectToService binds the Media3 session on construction. Tests and
+ *   headless tooling pass false so the UI can be composed without a playback
+ *   service; the screens simply stay in their idle state.
+ */
+class AuraViewModel(
+  application: Application,
+  connectToService: Boolean = true,
+) : AndroidViewModel(application) {
   private val container = AuraApp.container
   private val library = container.library
   private val listening = container.listening
@@ -186,9 +194,14 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
   private var controller: MediaController? = null
   private var restored = false
 
-  private val controllerFuture = MediaController.Builder(
-    application, SessionToken(application, android.content.ComponentName(application, PlaybackService::class.java)),
-  ).buildAsync()
+  private val controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? =
+    if (connectToService) {
+      MediaController.Builder(
+        application, SessionToken(application, android.content.ComponentName(application, PlaybackService::class.java)),
+      ).buildAsync()
+    } else {
+      null
+    }
 
   private val listener = object : Player.Listener {
     override fun onEvents(player: Player, events: Player.Events) {
@@ -212,8 +225,9 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
   }
 
   init {
-    controllerFuture.addListener({
-      runCatching { controllerFuture.get() }.onSuccess { media ->
+    val future = controllerFuture
+    future?.addListener({
+      runCatching { future.get() }.onSuccess { media ->
         controller = media
         media.addListener(listener)
         refreshQueue(media)
@@ -1031,7 +1045,7 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
   override fun onCleared() {
     downloadJobs.values.forEach { it.cancel() }
     controller?.removeListener(listener)
-    MediaController.releaseFuture(controllerFuture)
+    controllerFuture?.let { MediaController.releaseFuture(it) }
     noticesChannel.close()
     openPlayerChannel.close()
     super.onCleared()

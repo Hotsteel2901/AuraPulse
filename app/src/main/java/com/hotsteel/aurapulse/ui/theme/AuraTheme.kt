@@ -19,6 +19,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hotsteel.aurapulse.R
@@ -159,10 +160,15 @@ fun rememberDynamicScheme(dark: Boolean): ColorScheme? {
 private val Display = FontFamily(Font(R.font.space_grotesk, FontWeight.Normal))
 private val Body = FontFamily(Font(R.font.plus_jakarta_sans, FontWeight.Normal))
 
-private fun emphasized(style: TextStyle): TextStyle = style.copy(
-  fontWeight = FontWeight.SemiBold,
-  letterSpacing = style.letterSpacing * 0.9f,
-)
+private fun emphasized(style: TextStyle): TextStyle {
+  // Several base styles inherit the default TextUnit.Unspecified letter spacing.
+  // Scaling that value throws at composition time, so only tightened text is touched.
+  val spacing = style.letterSpacing
+  return style.copy(
+    fontWeight = FontWeight.SemiBold,
+    letterSpacing = if (spacing == TextUnit.Unspecified) spacing else spacing * 0.9f,
+  )
+}
 
 private fun buildTypography(): Typography {
   val display = TextStyle(fontFamily = Display, fontWeight = FontWeight.Medium)

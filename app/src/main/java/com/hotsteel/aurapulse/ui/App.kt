@@ -83,12 +83,17 @@ private val tabs = listOf(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun AuraRoot(vm: AuraViewModel, onChangeLanguage: (String) -> Unit, onChangeDarkTheme: (Boolean) -> Unit = {}) {
+fun AuraRoot(
+  vm: AuraViewModel,
+  onChangeLanguage: (String) -> Unit,
+  onChangeDarkTheme: (Boolean) -> Unit = {},
+  initialRoute: Route = Route.Library,
+) {
   val settings by vm.settings.collectAsStateWithLifecycle()
   val playback by vm.playback.collectAsStateWithLifecycle()
   val resources = LocalContext.current.resources
   val snackbar = remember { SnackbarHostState() }
-  val stack = remember { mutableStateListOf<Route>(Route.Library) }
+  val stack = remember { mutableStateListOf(initialRoute) }
   var playerOpen by rememberSaveable { mutableStateOf(false) }
   var onboarded by rememberSaveable { mutableStateOf(settings.onboardingDone) }
 
