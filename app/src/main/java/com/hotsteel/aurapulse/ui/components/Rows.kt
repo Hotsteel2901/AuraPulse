@@ -64,10 +64,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.hotsteel.aurapulse.core.SafeHaptics
 import com.hotsteel.aurapulse.core.fmt
 import com.hotsteel.aurapulse.data.library.PlaylistEntity
 import com.hotsteel.aurapulse.data.library.Source
@@ -325,7 +326,7 @@ fun MiniPlayer(
 ) {
   val state by vm.playback.collectAsStateWithLifecycle()
   val track = state.track ?: return
-  val haptics = LocalHapticFeedback.current
+  val context = LocalContext.current
   val settings by vm.settings.collectAsStateWithLifecycle()
   val hapticsOn = settings.haptics
   val interaction = remember { MutableInteractionSource() }
@@ -355,7 +356,7 @@ fun MiniPlayer(
             overflow = TextOverflow.Ellipsis,
           )
         }
-        IconButton(onClick = { if (hapticsOn) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); vm.toggle() }) {
+        IconButton(onClick = { if (hapticsOn) SafeHaptics.tick(context); vm.toggle() }) {
           Icon(
             if (state.playing) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = if (state.playing) "Pause" else "Play",

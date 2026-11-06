@@ -101,10 +101,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -115,6 +113,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hotsteel.aurapulse.R
 import com.hotsteel.aurapulse.core.RenderGuard
+import com.hotsteel.aurapulse.core.SafeHaptics
 import com.hotsteel.aurapulse.core.fmt
 import com.hotsteel.aurapulse.data.library.LyricLine
 import com.hotsteel.aurapulse.data.library.TrackEntity
@@ -155,7 +154,7 @@ fun NowPlayingScreen(
   val sleep by vm.sleep.collectAsStateWithLifecycle()
   val lyrics by vm.lyrics.collectAsStateWithLifecycle()
   val settings by vm.settings.collectAsStateWithLifecycle()
-  val haptics = LocalHapticFeedback.current
+  val context = LocalContext.current
 
   var panel by remember { mutableStateOf(PlayerPanel.NONE) }
   var actions by remember { mutableStateOf(false) }
@@ -271,7 +270,7 @@ fun NowPlayingScreen(
           sleepActive = sleep.active,
           hasLyrics = lyrics != null,
           onPick = { chosen ->
-            if (settings.haptics) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+            if (settings.haptics) SafeHaptics.tick(context)
             panel = if (panel == chosen) PlayerPanel.NONE else chosen
           },
         )
@@ -533,14 +532,14 @@ private fun WavySeekBar(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, repeat: Int, on: Boolean) {
-  val haptics = LocalHapticFeedback.current
+  val context = LocalContext.current
   Row(
     Modifier.fillMaxWidth(),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.SpaceBetween,
   ) {
     IconButton(onClick = {
-      if (on) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+      if (on) SafeHaptics.tick(context)
       vm.toggleShuffle()
     }) {
       Icon(
@@ -557,7 +556,7 @@ private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, 
       Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next_track), modifier = Modifier.size(32.dp))
     }
     IconButton(onClick = {
-      if (on) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+      if (on) SafeHaptics.tick(context)
       vm.cycleRepeat()
     }) {
       Icon(
@@ -577,7 +576,7 @@ private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, 
 
 @Composable
 private fun PlayPauseButton(vm: AuraViewModel, playing: Boolean, on: Boolean) {
-  val haptics = LocalHapticFeedback.current
+  val context = LocalContext.current
   var lastToggle by remember { mutableLongStateOf(0L) }
   val interaction = remember { MutableInteractionSource() }
   val scale = rememberPressScale(interaction, 0.92f)
@@ -598,7 +597,7 @@ private fun PlayPauseButton(vm: AuraViewModel, playing: Boolean, on: Boolean) {
           val now = android.os.SystemClock.uptimeMillis()
           if (now - lastToggle < 350L) return@toggle
           lastToggle = now
-          if (on) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+          if (on) SafeHaptics.press(context)
           vm.toggle()
         },
       ),

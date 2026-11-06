@@ -50,14 +50,31 @@ object MainThreadWatchdog {
     handler.post(beat)
 
     Thread({
+      var lastCheck = SystemClock.uptimeMillis()
+      var strikes = 0
       while (true) {
         try {
           Thread.sleep(1_000)
         } catch (_: InterruptedException) {
           return@Thread
         }
-        val stalled = SystemClock.uptimeMillis() - lastBeat.get()
-        if (stalled >= TIMEOUT_MS && reported.compareAndSet(false, true)) {
+        val now = SystemClock.uptimeMillis()
+        val drift = now - lastCheck - 1_000
+        lastCheck = now
+        // A suspended process (cached in the background, or a sleeping device)
+        // freezes this thread and the heartbeat together. The gap that follows
+        // says nothing about the main thread, and reading it as one produced a
+        // "unresponsive for 1522176 ms" report that sent the investigation after
+        // an innocent notification update.
+        if (drift > 2_500) {
+          strikes = 0
+          continue
+        }
+        val stalled = now - lastBeat.get()
+        // Two consecutive observations: a single late heartbeat is a GC pause,
+        // not a freeze worth throwing away the user's session over.
+        strikes = if (stalled >= TIMEOUT_MS) strikes + 1 else 0
+        if (strikes >= 2 && reported.compareAndSet(false, true)) {
           // Stop every ambient animation before writing the report. A stall this
           // long means the render thread is thrashing on something decorative.
           RenderGuard.calmDown()
