@@ -2,7 +2,6 @@ package com.hotsteel.aurapulse.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -16,9 +15,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,8 +73,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
@@ -86,9 +81,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.toShape
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -97,6 +93,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -107,6 +104,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -114,6 +112,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hotsteel.aurapulse.R
+import com.hotsteel.aurapulse.core.RenderGuard
 import com.hotsteel.aurapulse.core.fmt
 import com.hotsteel.aurapulse.data.library.LyricLine
 import com.hotsteel.aurapulse.data.library.TrackEntity
@@ -125,6 +124,7 @@ import com.hotsteel.aurapulse.ui.components.MarqueeText
 import com.hotsteel.aurapulse.ui.components.PlayingBars
 import com.hotsteel.aurapulse.ui.components.SourceBadge
 import com.hotsteel.aurapulse.ui.components.TrackActionsSheet
+import com.hotsteel.aurapulse.ui.components.WaveProgressBar
 import com.hotsteel.aurapulse.ui.components.artworkColors
 import com.hotsteel.aurapulse.ui.components.rememberPressScale
 import com.hotsteel.aurapulse.ui.theme.hueGradient
@@ -162,28 +162,33 @@ fun NowPlayingScreen(
   val palette = remember(track?.id) { track?.artworkColors() ?: hueGradient(210f) }
 
   val surfaceColor = MaterialTheme.colorScheme.surface
-  Box(Modifier.fillMaxSize().background(surfaceColor)) {
-    // Deep gradient derived from the artwork, plus the drifting aura used app-wide.
-    Canvas(Modifier.fillMaxSize()) {
-      drawRect(
-        Brush.verticalGradient(
+  Box(
+    Modifier
+      .fillMaxSize()
+      .background(surfaceColor)
+      // Cached display list: the artwork wash is rebuilt only when the palette or
+      // the size changes, never on the frame clock.
+      .drawWithCache {
+        val wash = Brush.verticalGradient(
           listOf(
             palette.first().copy(alpha = 0.34f),
             surfaceColor.copy(alpha = 0.94f),
             surfaceColor,
           ),
-        ),
-      )
-      drawCircle(
-        brush = Brush.radialGradient(
+        )
+        val glowCenter = Offset(size.width * 0.86f, size.height * 0.08f)
+        val glowRadius = size.minDimension * 0.9f
+        val glow = Brush.radialGradient(
           listOf(palette.last().copy(alpha = 0.26f), Color.Transparent),
-          center = Offset(size.width * 0.86f, size.height * 0.08f),
-          radius = size.minDimension * 0.9f,
-        ),
-        radius = size.minDimension * 0.9f,
-        center = Offset(size.width * 0.86f, size.height * 0.08f),
-      )
-    }
+          center = glowCenter,
+          radius = glowRadius,
+        )
+        onDrawBehind {
+          drawRect(wash)
+          drawCircle(glow, radius = glowRadius, center = glowCenter)
+        }
+      },
+  ) {
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
       PlayerTopBar(
@@ -208,7 +213,9 @@ fun NowPlayingScreen(
             AuraRing(
               size = side,
               playing = playback.playing,
-              colors = palette,
+              primary = palette[0],
+              secondary = palette.getOrElse(1) { palette[0] },
+              tertiary = palette.getOrElse(2) { palette[0] },
               modifier = Modifier.align(Alignment.Center),
             )
             Artwork(
@@ -288,13 +295,20 @@ private fun breathingModifier(playing: Boolean): Modifier {
   // The transition is always composed: branching around rememberInfiniteTransition
   // changes the slot table layout on every play/pause toggle.
   val transition = rememberInfiniteTransition(label = "breath")
-  val pulse by transition.animateFloat(
+  val pulse = transition.animateFloat(
     initialValue = 0.988f,
     targetValue = 1f,
     animationSpec = infiniteRepeatable(tween(3600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
     label = "pulse",
   )
-  return if (playing) Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse } else Modifier
+  // Read in the draw phase. Reading it in composition (the old `by` delegate)
+  // recomposed the artwork, and therefore its Coil image, on every frame.
+  val calm by RenderGuard.calm.collectAsState()
+  return Modifier.graphicsLayer {
+    val value = if (playing && !calm) pulse.value else 1f
+    scaleX = value
+    scaleY = value
+  }
 }
 
 @Composable
@@ -332,11 +346,26 @@ private fun PlayerTopBar(
   }
 }
 
-/** Rotating shape-morph ring behind the artwork; purely decorative, stops when paused. */
+/**
+ * Rotating shape ring behind the artwork. The display list is completely static
+ * and rotation is a layer transform, so a full turn costs one matrix update per
+ * frame instead of re-rasterising the ring, its arcs and its satellites.
+ */
 @Composable
-private fun AuraRing(size: androidx.compose.ui.unit.Dp, playing: Boolean, colors: List<Color>, modifier: Modifier = Modifier) {
+private fun AuraRing(
+  size: androidx.compose.ui.unit.Dp,
+  playing: Boolean,
+  primary: Color,
+  secondary: Color,
+  tertiary: Color,
+  modifier: Modifier = Modifier,
+) {
+  // Colour parameters, not a List: an unstable list argument made Compose treat
+  // this composable as always-changed, so every playback tick redrew the ring.
+  val colors = remember(primary, secondary, tertiary) { listOf(primary, secondary, tertiary) }
+  val calm by RenderGuard.calm.collectAsState()
   val transition = rememberInfiniteTransition(label = "ring")
-  val spin by transition.animateFloat(
+  val spin = transition.animateFloat(
     initialValue = 0f,
     targetValue = 360f,
     animationSpec = infiniteRepeatable(
@@ -348,10 +377,13 @@ private fun AuraRing(size: androidx.compose.ui.unit.Dp, playing: Boolean, colors
   // Building a sweep gradient allocates a native shader, so it is cached rather
   // than recreated on every animation frame.
   val ringBrush = remember(colors) {
-    val stops = colors.ifEmpty { listOf(Color.Gray) }
-    Brush.sweepGradient(stops.map { it.copy(alpha = 0.55f) } + stops.first().copy(alpha = 0.55f))
+    Brush.sweepGradient(colors.map { it.copy(alpha = 0.55f) } + colors.first().copy(alpha = 0.55f))
   }
-  Canvas(modifier.size(size)) {
+  Canvas(
+    modifier
+      .size(size)
+      .graphicsLayer { rotationZ = if (playing && !calm) spin.value else 0f },
+  ) {
     val radius = this.size.minDimension / 2f - 2.dp.toPx()
     drawCircle(
       brush = ringBrush,
@@ -360,10 +392,9 @@ private fun AuraRing(size: androidx.compose.ui.unit.Dp, playing: Boolean, colors
     )
     val inner = radius - 9.dp.toPx()
     for (index in 0..2) {
-      val start = spin + index * 120f
       drawArc(
-        color = colors[index % colors.size].copy(alpha = 0.5f),
-        startAngle = start,
+        color = colors[index].copy(alpha = 0.5f),
+        startAngle = index * 120f,
         sweepAngle = 46f,
         useCenter = false,
         topLeft = Offset(center.x - inner, center.y - inner),
@@ -371,12 +402,12 @@ private fun AuraRing(size: androidx.compose.ui.unit.Dp, playing: Boolean, colors
         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round),
       )
     }
-    // Three drifting satellites, echoing the app backdrop.
+    // Three satellites, echoing the app backdrop; the layer rotation moves them.
     repeat(3) { index ->
-      val angle = Math.toRadians((spin * 1.4 + index * 120).toDouble())
+      val angle = Math.toRadians((index * 120).toDouble())
       val distance = radius - 22.dp.toPx()
       drawCircle(
-        color = colors[index % colors.size].copy(alpha = 0.85f),
+        color = colors[index].copy(alpha = 0.85f),
         radius = (2.6f - index * 0.4f).dp.toPx(),
         center = Offset(
           center.x + (cos(angle) * distance).toFloat(),
@@ -479,15 +510,11 @@ private fun WavySeekBar(
       ),
     contentAlignment = Alignment.Center,
   ) {
-    LinearWavyProgressIndicator(
-      progress = { fraction },
-      modifier = Modifier.fillMaxWidth(),
-      color = MaterialTheme.colorScheme.primary,
-      trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-      // waveSpeed stays constant: a zero value makes the indicator derive an
-      // invalid repeat duration. The amplitude alone controls the animation.
-      waveSpeed = 16.dp,
-      amplitude = { if (playing && canSeek) 1f else 0f },
+    WaveProgressBar(
+      progress = fraction,
+      modifier = Modifier.fillMaxWidth().height(30.dp),
+      barHeight = 6.dp,
+      amplitude = if (playing) 3.dp else 0.dp,
     )
   }
 }
@@ -542,43 +569,36 @@ private fun PlayPauseButton(vm: AuraViewModel, playing: Boolean, on: Boolean) {
   val haptics = LocalHapticFeedback.current
   var lastToggle by remember { mutableLongStateOf(0L) }
   val interaction = remember { MutableInteractionSource() }
-  val scale = rememberPressScale(interaction, 0.9f)
-  val motion = MaterialTheme.motionScheme
-  Surface(
+  val scale = rememberPressScale(interaction, 0.92f)
+  // A clipped box rather than Surface(shape = Cookie9Sided, shadowElevation = 10.dp).
+  // A generic nine-sided outline has no cheap shadow path, so every frame of the
+  // press animation re-tessellated the shadow on the render thread.
+  Box(
     modifier = Modifier
       .size(84.dp)
-      .graphicsLayer { scaleX = scale; scaleY = scale },
-    shape = MaterialShapes.Cookie9Sided.toShape(),
-    color = MaterialTheme.colorScheme.primary,
-    tonalElevation = 6.dp,
-    shadowElevation = 10.dp,
-    onClick = toggle@{
-      val now = android.os.SystemClock.uptimeMillis()
-      if (now - lastToggle < 350L) return@toggle
-      lastToggle = now
-      if (on) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-      vm.toggle()
-    },
-    interactionSource = interaction,
-  ) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-      AnimatedContent(
-        targetState = playing,
-        transitionSpec = {
-          (fadeIn(motion.fastEffectsSpec()) +
-            scaleIn(motion.fastSpatialSpec(), initialScale = 0.7f)) togetherWith
-            fadeOut(motion.fastEffectsSpec())
+      .graphicsLayer { scaleX = scale; scaleY = scale }
+      .clip(CircleShape)
+      .background(MaterialTheme.colorScheme.primary)
+      .clickable(
+        interactionSource = interaction,
+        indication = ripple(bounded = true, radius = 42.dp),
+        role = Role.Button,
+        onClick = toggle@{
+          val now = android.os.SystemClock.uptimeMillis()
+          if (now - lastToggle < 350L) return@toggle
+          lastToggle = now
+          if (on) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+          vm.toggle()
         },
-        label = "playIcon",
-      ) { isPlaying ->
-        Icon(
-          if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-          contentDescription = if (isPlaying) stringResource(R.string.pause) else stringResource(R.string.play),
-          tint = MaterialTheme.colorScheme.onPrimary,
-          modifier = Modifier.size(40.dp),
-        )
-      }
-    }
+      ),
+    contentAlignment = Alignment.Center,
+  ) {
+    Icon(
+      if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+      contentDescription = if (playing) stringResource(R.string.pause) else stringResource(R.string.play),
+      tint = MaterialTheme.colorScheme.onPrimary,
+      modifier = Modifier.size(40.dp),
+    )
   }
 }
 

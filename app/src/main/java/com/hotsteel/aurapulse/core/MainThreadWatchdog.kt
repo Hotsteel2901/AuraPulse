@@ -31,7 +31,6 @@ object MainThreadWatchdog {
   private const val BEAT_MS = 500L
 
   fun install(context: Context) {
-    if (!BuildConfig.DEBUG) return
     // Robolectric's paused looper treats the repeating heartbeat as work that
     // never finishes, so every idle() call would spin forever.
     if (android.os.Build.FINGERPRINT == "robolectric") return
@@ -59,6 +58,9 @@ object MainThreadWatchdog {
         }
         val stalled = SystemClock.uptimeMillis() - lastBeat.get()
         if (stalled >= TIMEOUT_MS && reported.compareAndSet(false, true)) {
+          // Stop every ambient animation before writing the report. A stall this
+          // long means the render thread is thrashing on something decorative.
+          RenderGuard.calmDown()
           write(app, stalled, main.thread)
         }
       }
@@ -66,6 +68,9 @@ object MainThreadWatchdog {
   }
 
   private fun write(context: Context, stalledMs: Long, thread: Thread) {
+    // The guard flips in every build; the report is only worth a disk write in
+    // debug, where the crash screen can show it.
+    if (!BuildConfig.DEBUG) return
     runCatching {
       val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
       val report = buildString {

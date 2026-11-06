@@ -46,7 +46,6 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -365,10 +364,11 @@ fun MiniPlayer(
         IconButton(onClick = vm::next) { Icon(Icons.Default.SkipNext, contentDescription = "Next") }
       }
       val fraction = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
-      LinearWavyProgressIndicator(
-        progress = { fraction },
-        modifier = Modifier.fillMaxWidth().height(6.dp).padding(horizontal = 12.dp),
-        waveSpeed = if (state.playing) 14.dp else 0.dp,
+      WaveProgressBar(
+        progress = fraction,
+        modifier = Modifier.fillMaxWidth().height(12.dp).padding(horizontal = 12.dp),
+        barHeight = 4.dp,
+        amplitude = if (state.playing) 2.dp else 0.dp,
         color = MaterialTheme.colorScheme.primary,
         trackColor = MaterialTheme.colorScheme.surfaceVariant,
       )

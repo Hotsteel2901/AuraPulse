@@ -3,6 +3,7 @@ package com.hotsteel.aurapulse.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -43,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -124,6 +126,20 @@ fun AuraRoot(
 
     val current = stack.last()
     val motion = MaterialTheme.motionScheme
+    // Tracks the player's enter and exit so the tab underneath can stop drawing
+    // once the sheet is fully open. Without this the whole library screen was
+    // drawn into the same surface behind an opaque player, doubling the per-frame
+    // fill cost for as long as the player stayed open.
+    val playerVisible = remember { MutableTransitionState(false) }
+    playerVisible.targetState = playerOpen
+
+    Box(
+      Modifier
+        .fillMaxSize()
+        .drawWithContent {
+          if (!(playerOpen && playerVisible.isIdle)) drawContent()
+        },
+    ) {
 
     Scaffold(
       containerColor = Color.Transparent,
@@ -237,9 +253,10 @@ fun AuraRoot(
         }
       }
     }
+    }
 
     AnimatedVisibility(
-      visible = playerOpen,
+      visibleState = playerVisible,
       enter = slideInVertically(motion.defaultSpatialSpec()) { it } + fadeIn(motion.fastEffectsSpec()),
       exit = slideOutVertically(motion.fastSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec()),
     ) {
