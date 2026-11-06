@@ -240,15 +240,22 @@ fun AuraTheme(
   }
   val dynamic = if (settings.dynamicColor) rememberDynamicScheme(dark) else null
   val scheme = dynamic ?: remember(settings, dark) { auraScheme(settings, dark) }
-  val motion = when (settings.motion) {
-    MotionLevel.FULL -> MotionScheme.expressive()
-    MotionLevel.REDUCED -> MotionScheme.standard()
-    MotionLevel.SYSTEM -> if (android.provider.Settings.Global.getFloat(
-        LocalContext.current.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
-      ) == 0f) MotionScheme.standard() else MotionScheme.expressive()
+  val context = LocalContext.current
+  // None of these are cheap: the motion scheme reads a system setting over IPC,
+  // the shapes build polygons and the typography loads two font families. They
+  // used to be rebuilt on every recomposition of the root, which happens
+  // whenever playback state changes.
+  val motion = remember(settings.motion, context) {
+    when (settings.motion) {
+      MotionLevel.FULL -> MotionScheme.expressive()
+      MotionLevel.REDUCED -> MotionScheme.standard()
+      MotionLevel.SYSTEM -> if (android.provider.Settings.Global.getFloat(
+          context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
+        ) == 0f) MotionScheme.standard() else MotionScheme.expressive()
+    }
   }
-  val shapes = auraShapes(settings.cornerScale)
-  val typography = buildTypography()
+  val shapes = remember(settings.cornerScale) { auraShapes(settings.cornerScale) }
+  val typography = remember { buildTypography() }
   if (safeMode) {
     // Recovery path: the plain theme still renders every screen and keeps
     // MotionScheme.standard(), which isolates expressive-only failures.

@@ -71,6 +71,8 @@ import com.hotsteel.aurapulse.ui.screens.PlaylistsScreen
 import com.hotsteel.aurapulse.ui.screens.SearchScreen
 import com.hotsteel.aurapulse.ui.screens.SettingsScreen
 import com.hotsteel.aurapulse.ui.theme.AuraTheme
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private data class Tab(val route: Route, val label: Int, val icon: ImageVector)
 
@@ -91,7 +93,15 @@ fun AuraRoot(
   safeMode: Boolean = false,
 ) {
   val settings by vm.settings.collectAsStateWithLifecycle()
-  val playback by vm.playback.collectAsStateWithLifecycle()
+  // Only the two facts the shell needs. Collecting the whole PlaybackUi made the
+  // entire theme, scaffold and navigation bar recompose every 400 ms while audio
+  // played, which starved the main thread.
+  val hasTrack by remember(vm) {
+    vm.playback.map { it.track != null }.distinctUntilChanged()
+  }.collectAsStateWithLifecycle(initialValue = false)
+  val isPlaying by remember(vm) {
+    vm.playback.map { it.playing }.distinctUntilChanged()
+  }.collectAsStateWithLifecycle(initialValue = false)
   val resources = LocalContext.current.resources
   val snackbar = remember { SnackbarHostState() }
   val stack = remember { mutableStateListOf(initialRoute) }
@@ -121,7 +131,7 @@ fun AuraRoot(
       snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = 8.dp)) },
       bottomBar = {
         Column {
-          if (playback.track != null) {
+          if (hasTrack) {
             MiniPlayer(vm, onOpen = { playerOpen = true })
           }
           if (current.isRoot) {
@@ -155,7 +165,7 @@ fun AuraRoot(
       },
     ) { padding ->
       Box(Modifier.fillMaxSize()) {
-        AuraBackdrop(Modifier.fillMaxSize(), playing = playback.playing)
+        AuraBackdrop(Modifier.fillMaxSize(), playing = isPlaying)
         AnimatedContent(
           targetState = current,
           modifier = Modifier.fillMaxSize().padding(padding),

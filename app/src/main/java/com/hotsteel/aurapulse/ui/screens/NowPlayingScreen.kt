@@ -285,7 +285,8 @@ fun NowPlayingScreen(
 
 @Composable
 private fun breathingModifier(playing: Boolean): Modifier {
-  if (!playing) return Modifier
+  // The transition is always composed: branching around rememberInfiniteTransition
+  // changes the slot table layout on every play/pause toggle.
   val transition = rememberInfiniteTransition(label = "breath")
   val pulse by transition.animateFloat(
     initialValue = 0.988f,
@@ -293,7 +294,7 @@ private fun breathingModifier(playing: Boolean): Modifier {
     animationSpec = infiniteRepeatable(tween(3600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
     label = "pulse",
   )
-  return Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse }
+  return if (playing) Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse } else Modifier
 }
 
 @Composable
@@ -344,10 +345,16 @@ private fun AuraRing(size: androidx.compose.ui.unit.Dp, playing: Boolean, colors
     ),
     label = "spin",
   )
+  // Building a sweep gradient allocates a native shader, so it is cached rather
+  // than recreated on every animation frame.
+  val ringBrush = remember(colors) {
+    val stops = colors.ifEmpty { listOf(Color.Gray) }
+    Brush.sweepGradient(stops.map { it.copy(alpha = 0.55f) } + stops.first().copy(alpha = 0.55f))
+  }
   Canvas(modifier.size(size)) {
     val radius = this.size.minDimension / 2f - 2.dp.toPx()
     drawCircle(
-      brush = Brush.sweepGradient(colors.map { it.copy(alpha = 0.55f) } + colors.first().copy(alpha = 0.55f)),
+      brush = ringBrush,
       radius = radius,
       style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
     )
@@ -477,7 +484,9 @@ private fun WavySeekBar(
       modifier = Modifier.fillMaxWidth(),
       color = MaterialTheme.colorScheme.primary,
       trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-      waveSpeed = if (playing && canSeek) 16.dp else 0.dp,
+      // waveSpeed stays constant: a zero value makes the indicator derive an
+      // invalid repeat duration. The amplitude alone controls the animation.
+      waveSpeed = 16.dp,
       amplitude = { if (playing && canSeek) 1f else 0f },
     )
   }
@@ -531,23 +540,22 @@ private fun TransportRow(vm: AuraViewModel, playing: Boolean, shuffle: Boolean, 
 @Composable
 private fun PlayPauseButton(vm: AuraViewModel, playing: Boolean, on: Boolean) {
   val haptics = LocalHapticFeedback.current
+  var lastToggle by remember { mutableLongStateOf(0L) }
   val interaction = remember { MutableInteractionSource() }
   val scale = rememberPressScale(interaction, 0.9f)
   val motion = MaterialTheme.motionScheme
-  val container by animateColorAsState(
-    targetValue = MaterialTheme.colorScheme.primary,
-    animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-    label = "playContainer",
-  )
   Surface(
     modifier = Modifier
       .size(84.dp)
       .graphicsLayer { scaleX = scale; scaleY = scale },
     shape = MaterialShapes.Cookie9Sided.toShape(),
-    color = container,
+    color = MaterialTheme.colorScheme.primary,
     tonalElevation = 6.dp,
     shadowElevation = 10.dp,
-    onClick = {
+    onClick = toggle@{
+      val now = android.os.SystemClock.uptimeMillis()
+      if (now - lastToggle < 350L) return@toggle
+      lastToggle = now
       if (on) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
       vm.toggle()
     },

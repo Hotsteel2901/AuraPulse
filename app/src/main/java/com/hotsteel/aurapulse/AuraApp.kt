@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.hotsteel.aurapulse.core.CrashLog
+import com.hotsteel.aurapulse.core.MainThreadWatchdog
 import com.hotsteel.aurapulse.data.SettingsStore
 import com.hotsteel.aurapulse.data.discovery.DiscoveryClient
 import com.hotsteel.aurapulse.data.github.GistSync
@@ -42,6 +43,7 @@ class AuraApp : Application() {
   override fun onCreate() {
     super.onCreate()
     CrashLog.install(this)
+    MainThreadWatchdog.install(this)
     instance = this
     container = AppContainer(this)
     EqualizerController.initialize(this)

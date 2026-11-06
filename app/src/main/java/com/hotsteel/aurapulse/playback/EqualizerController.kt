@@ -6,6 +6,10 @@ import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,11 +43,14 @@ data class EqualizerState(
  */
 object EqualizerController {
   private var prefs: android.content.SharedPreferences? = null
-  private var equalizer: Equalizer? = null
-  private var bass: BassBoost? = null
-  private var virtualizer: Virtualizer? = null
-  private var loudness: LoudnessEnhancer? = null
-  private var sessionId: Int = 0
+  @Volatile private var equalizer: Equalizer? = null
+  @Volatile private var bass: BassBoost? = null
+  @Volatile private var virtualizer: Virtualizer? = null
+  @Volatile private var loudness: LoudnessEnhancer? = null
+  @Volatile private var sessionId: Int = 0
+  @Volatile private var targetSession: Int = 0
+  private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  private val lock = Any()
   private var selectedPreset: String? = null
   private var custom: MutableList<EqPreset> = mutableListOf()
   private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -65,10 +72,28 @@ object EqualizerController {
     custom = readCustom(prefs!!).toMutableList()
   }
 
+  /**
+   * Building an AudioEffect is a synchronous binder call into audioserver and
+   * can block while the session's effect chain is being set up. Doing it on the
+   * main thread froze the player the moment playback started, so the whole
+   * attach runs on a background thread; the UI reads [state] instead.
+   */
   fun attach(audioSessionId: Int) {
-    if (audioSessionId <= 0 || audioSessionId == sessionId && equalizer != null) return
-    releaseEffects()
-    sessionId = audioSessionId
+    if (audioSessionId <= 0) return
+    if (audioSessionId == targetSession && equalizer != null) return
+    targetSession = audioSessionId
+    io.launch {
+      synchronized(lock) {
+        if (targetSession != audioSessionId) return@synchronized
+        releaseEffects()
+        sessionId = audioSessionId
+        build(audioSessionId)
+        refresh()
+      }
+    }
+  }
+
+  private fun build(audioSessionId: Int) {
     try {
       val eq = Equalizer(0, audioSessionId)
       equalizer = eq
@@ -86,7 +111,6 @@ object EqualizerController {
       equalizer = null
     }
     attachEffect()
-    refresh()
   }
 
   private fun attachEffect() {
@@ -212,8 +236,13 @@ object EqualizerController {
   }
 
   fun release() {
-    releaseEffects()
-    mutable.value = EqualizerState(checked = true)
+    targetSession = 0
+    io.launch {
+      synchronized(lock) {
+        releaseEffects()
+        mutable.value = EqualizerState(checked = true)
+      }
+    }
   }
 
   private fun refresh() {

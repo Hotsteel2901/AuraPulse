@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import com.hotsteel.aurapulse.core.CrashLog
+import com.hotsteel.aurapulse.core.MainThreadWatchdog
 import com.hotsteel.aurapulse.data.SettingsStore
 import com.hotsteel.aurapulse.ui.AuraRoot
 import com.hotsteel.aurapulse.ui.AuraViewModel
@@ -65,7 +66,7 @@ class MainActivity : ComponentActivity() {
     // A crash that happened before the first frame is kept on disk. Showing it
     // with plain platform views means the report stays readable even when the
     // Compose theme is what broke.
-    val crash = CrashLog.last(this)
+    val crash = CrashLog.last(this) ?: MainThreadWatchdog.last(this)
     if (crash != null) {
       showingCrashReport = true
       showCrashReport(crash)
@@ -172,11 +173,13 @@ class MainActivity : ComponentActivity() {
     })
     column.addView(action(R.string.crash_safe_mode) {
       CrashLog.clear(this)
+      MainThreadWatchdog.clear(this)
       prefs().edit().putBoolean(KEY_SAFE_MODE, true).apply()
       recreate()
     })
     column.addView(action(R.string.crash_normal_start) {
       CrashLog.clear(this)
+      MainThreadWatchdog.clear(this)
       prefs().edit().putBoolean(KEY_SAFE_MODE, false).apply()
       recreate()
     })
