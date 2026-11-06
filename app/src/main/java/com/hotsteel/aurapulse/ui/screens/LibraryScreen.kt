@@ -2,10 +2,10 @@ package com.hotsteel.aurapulse.ui.screens
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,10 +26,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
@@ -41,6 +40,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.UploadFile
@@ -162,7 +162,42 @@ fun LibraryScreen(
   val totalMs = remember(tracks) { tracks.sumOf { it.durationMs } }
   val recent = remember(tracks) { tracks.sortedByDescending { it.addedAt }.take(12) }
 
-  Scaffold(containerColor = Color.Transparent, floatingActionButton = {
+  Scaffold(
+    containerColor = Color.Transparent,
+    // Contextual bar rather than a floating overlay: it lives in the topBar slot
+    // so the list is padded by its real height and can never be covered.
+    topBar = {
+      AnimatedVisibility(
+        visible = selectionMode,
+        enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+        exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+      ) {
+        Surface(
+          color = MaterialTheme.colorScheme.surfaceContainerHigh,
+          shape = RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp),
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Row(
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Text(
+              stringResource(R.string.selected_count, selection.size),
+              style = MaterialTheme.typography.titleSmall,
+              modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = { vm.selectAll(visible.map { it.id }) }) {
+              Icon(Icons.Default.SelectAll, contentDescription = stringResource(R.string.select_all))
+            }
+            IconButton(onClick = { confirmDelete = true }) {
+              Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+            }
+            TextButton(onClick = { vm.clearSelection() }) { Text(stringResource(R.string.clear_selection)) }
+          }
+        }
+      }
+    },
+    floatingActionButton = {
     if (!selectionMode) {
       Box {
         ExtendedFloatingActionButton(
@@ -439,30 +474,7 @@ fun LibraryScreen(
     }
   }
 
-  AnimatedVisibility(
-    visible = selectionMode,
-    enter = slideInVertically { -it } + fadeIn(),
-    exit = slideOutVertically { -it } + fadeOut(),
-  ) {
-    Surface(
-      color = MaterialTheme.colorScheme.surfaceContainerHigh,
-      shape = MaterialTheme.shapes.large,
-      modifier = Modifier.statusBarsPadding().padding(12.dp).fillMaxWidth(),
-    ) {
-      Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-          stringResource(R.string.selected_count, selection.size),
-          style = MaterialTheme.typography.titleSmall,
-          modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = { vm.selectAll(visible.map { it.id }) }) {
-          Icon(Icons.Default.ArrowUpward, contentDescription = stringResource(R.string.select_all))
-        }
-        IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete)) }
-        TextButton(onClick = { vm.clearSelection() }) { Text(stringResource(R.string.clear_selection)) }
-      }
-    }
-  }
+  // The selection bar lives in the Scaffold's topBar; see above.
 
   if (confirmDelete) {
     androidx.compose.material3.AlertDialog(

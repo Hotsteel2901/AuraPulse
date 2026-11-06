@@ -15,10 +15,11 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Insights
@@ -143,12 +144,22 @@ fun AuraRoot(
 
     Scaffold(
       containerColor = Color.Transparent,
-      contentWindowInsets = WindowInsets.navigationBars,
+      // safeDrawing, not navigationBars: the app draws edge to edge, so the
+      // content also has to stay clear of the status bar and any cutout.
+      // Without the top inset the first row of every tab sat under the clock
+      // and could not be tapped.
+      contentWindowInsets = WindowInsets.safeDrawing,
       snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = 8.dp)) },
       bottomBar = {
         Column {
           if (hasTrack) {
-            MiniPlayer(vm, onOpen = { playerOpen = true })
+            MiniPlayer(
+              vm,
+              onOpen = { playerOpen = true },
+              // The navigation bar supplies its own bottom inset; without it the
+              // mini player has to add one or it sits under the gesture bar.
+              modifier = if (current.isRoot) Modifier else Modifier.navigationBarsPadding(),
+            )
           }
           if (current.isRoot) {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)) {
@@ -184,7 +195,11 @@ fun AuraRoot(
         AuraBackdrop(Modifier.fillMaxSize(), playing = isPlaying)
         AnimatedContent(
           targetState = current,
-          modifier = Modifier.fillMaxSize().padding(padding),
+          // The inset is applied once, here, and then marked as consumed so the
+          // screens' own Scaffolds and paddings do not add a second status-bar
+          // gap. It also keeps the list viewport below the clock instead of
+          // letting rows scroll under it.
+          modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
           transitionSpec = {
             if (targetState.isRoot && initialState.isRoot) {
               fadeIn(motion.fastEffectsSpec()) togetherWith fadeOut(motion.fastEffectsSpec())

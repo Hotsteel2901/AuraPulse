@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -71,7 +73,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
   val last = pager.currentPage == pages.lastIndex
 
   Surface(color = MaterialTheme.colorScheme.surface) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
+    // Onboarding is an overlay outside the app Scaffold, so it owns its insets.
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 8.dp)) {
       Row(Modifier.fillMaxWidth().padding(top = 10.dp, start = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
           stringResource(R.string.app_name).uppercase(),
