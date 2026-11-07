@@ -5,7 +5,9 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /**
  * Haptics that cannot freeze the UI.
@@ -20,12 +22,23 @@ import java.util.concurrent.Executors
  * thread and later ticks are dropped instead of piling up.
  */
 object SafeHaptics {
-  private val worker = Executors.newSingleThreadExecutor { runnable ->
-    Thread(runnable, "aura-haptics").apply {
-      isDaemon = true
-      priority = Thread.MIN_PRIORITY
-    }
-  }
+  // One worker and a queue of one. An unbounded executor would remember every
+  // tap while the vibrator is wedged and then fire the whole backlog at once
+  // when it recovers; DiscardPolicy drops the extra ticks instead.
+  private val worker = ThreadPoolExecutor(
+    1,
+    1,
+    0L,
+    TimeUnit.MILLISECONDS,
+    ArrayBlockingQueue(1),
+    { runnable ->
+      Thread(runnable, "aura-haptics").apply {
+        isDaemon = true
+        priority = Thread.MIN_PRIORITY
+      }
+    },
+    ThreadPoolExecutor.DiscardPolicy(),
+  )
 
   @Volatile private var vibrator: Vibrator? = null
 

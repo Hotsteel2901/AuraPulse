@@ -133,6 +133,17 @@ class LibraryRepository(context: Context, private val db: AuraDatabase) {
 
   suspend fun add(track: TrackEntity): Boolean = withContext(Dispatchers.IO) { dao.insertTrack(track) != -1L }
 
+  /**
+   * Updates the private-copy pointer of a track that is already in the library.
+   *
+   * This must be an UPDATE, not [add]: adding uses INSERT OR IGNORE so that
+   * imports never overwrite an existing row, which also means a completed
+   * download (or its removal) would silently never be recorded.
+   */
+  suspend fun setDownloadedPath(id: String, path: String?) = withContext(Dispatchers.IO) {
+    dao.setDownloadedPath(id, path)
+  }
+
   suspend fun delete(ids: Collection<String>): List<TrackEntity> = withContext(Dispatchers.IO) {
     val removed = mutableListOf<TrackEntity>()
     db.withTransaction {
@@ -232,9 +243,12 @@ class LibraryRepository(context: Context, private val db: AuraDatabase) {
   }
 
   suspend fun setPlaylistTracks(id: String, ids: List<String>) = withContext(Dispatchers.IO) {
-    if (ids.size > MAX_PLAYLIST) return@withContext
+    // Keep the first MAX_PLAYLIST entries instead of discarding the whole list;
+    // the old early return left an imported playlist completely empty when the
+    // source had more entries than the cap.
+    val capped = ids.distinct().take(MAX_PLAYLIST)
     dao.playlist(id)?.let {
-      dao.putPlaylist(it.copy(trackIdsJson = encodeIds(ids.distinct()), updatedAt = System.currentTimeMillis()))
+      dao.putPlaylist(it.copy(trackIdsJson = encodeIds(capped), updatedAt = System.currentTimeMillis()))
     }
   }
 
@@ -289,11 +303,13 @@ class LibraryRepository(context: Context, private val db: AuraDatabase) {
 
   suspend fun loadQueue(): QueueStateEntity? = withContext(Dispatchers.IO) { dao.queueState() }
 
+  suspend fun clearQueueState() = withContext(Dispatchers.IO) { dao.clearQueueState() }
+
   suspend fun storageBytes(): Long = withContext(Dispatchers.IO) {
     listOf("downloads", "artwork").sumOf { dir -> File(app.filesDir, dir).walkTopDown().filter { it.isFile }.sumOf { it.length() } }
   }
 
-  fun clearArtworkCache() {
+  suspend fun clearArtworkCache() = withContext(Dispatchers.IO) {
     File(app.filesDir, "artwork").listFiles()?.forEach { it.delete() }
   }
 

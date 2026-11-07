@@ -47,6 +47,8 @@
     <string name="mix_forgotten_desc">三周以上没播过</string>
     <string name="mix_long">长途陪伴</string>
     <string name="mix_long_desc">六分钟以上的长曲</string>
+    <string name="mix_favorites">我的收藏</string>
+    <string name="mix_favorites_desc">你标星的全部曲目</string>
     <string name="see_all">查看全部</string>
     <string name="sort">排序</string>
     <string name="sort_added">最近添加</string>
@@ -288,6 +290,7 @@
     <string name="sync_needs_account">请先登录 GitHub</string>
     <string name="sync_publishing">正在发布歌单…</string>
     <string name="sync_published">歌单已发布为 Gist</string>
+    <string name="playlist_publish">发布为 Gist</string>
     <string name="sync_failed">同步失败：%1$s</string>
     <string name="sync_no_backup">此账号下没有找到 AuraPulse 备份</string>
     <string name="sync_device">设备</string>
@@ -299,7 +302,7 @@
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
-    <string name="theme_black">纯黑（AMOLED）</string>
+    <string name="theme_black">纯黑</string>
     <string name="settings_palette">配色</string>
     <string name="palette_aura">极光</string>
     <string name="palette_ember">余烬</string>

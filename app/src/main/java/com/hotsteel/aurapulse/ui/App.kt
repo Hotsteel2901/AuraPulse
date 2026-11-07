@@ -46,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -122,8 +121,15 @@ fun AuraRoot(
     LaunchedEffect(Unit) {
       vm.openPlayerRequests.collect { playerOpen = true }
     }
+    // Every detail screen passes this as its back action. A quick double tap
+    // used to pop twice; the second pop removed the root entry and the next
+    // composition read from an empty stack.
+    fun popRoute() {
+      if (stack.size > 1) stack.removeAt(stack.lastIndex)
+    }
+
     BackHandler(enabled = playerOpen) { playerOpen = false }
-    BackHandler(enabled = !playerOpen && stack.size > 1) { stack.removeAt(stack.lastIndex) }
+    BackHandler(enabled = !playerOpen && stack.size > 1) { popRoute() }
 
     val current = stack.last()
     val motion = MaterialTheme.motionScheme
@@ -143,7 +149,14 @@ fun AuraRoot(
     ) {
 
     Scaffold(
-      containerColor = Color.Transparent,
+      // The scaffold must paint the theme's own surface, not stay transparent.
+      // The window background (and the splash) is the dark brand colour, so in
+      // light mode a transparent scaffold left the light colour scheme drawing
+      // dark onBackground text over that dark window: page titles and track
+      // rows became invisible. Painting the background here also puts the same
+      // colour behind the status bar, so the icon appearance chosen from the
+      // scheme's luminance matches what is actually on screen.
+      containerColor = MaterialTheme.colorScheme.background,
       // safeDrawing, not navigationBars: the app draws edge to edge, so the
       // content also has to stay clear of the status bar and any cutout.
       // Without the top inset the first row of every tab sat under the clock
@@ -221,6 +234,10 @@ fun AuraRoot(
               onOpenAlbum = { stack.add(Route.Album(it)) },
               onOpenArtist = { stack.add(Route.Artist(it)) },
               onOpenDownloads = { stack.add(Route.Downloads) },
+              onOpenDiscover = {
+                if (stack.size == 1) stack[0] = Route.Discover
+                else { stack.clear(); stack.add(Route.Discover) }
+              },
             )
             Route.Discover -> DiscoverScreen(vm, onOpenDownloads = { stack.add(Route.Downloads) })
             Route.Insights -> InsightsScreen(vm)
@@ -233,37 +250,37 @@ fun AuraRoot(
             )
             Route.Search -> SearchScreen(
               vm,
-              onBack = { stack.removeAt(stack.lastIndex) },
+              onBack = { popRoute() },
               onOpenAlbum = { stack.add(Route.Album(it)) },
               onOpenArtist = { stack.add(Route.Artist(it)) },
             )
-            Route.AllTracks -> AllTracksScreen(vm, onBack = { stack.removeAt(stack.lastIndex) })
-            Route.Favorites -> FavoritesScreen(vm, onBack = { stack.removeAt(stack.lastIndex) })
+            Route.AllTracks -> AllTracksScreen(vm, onBack = { popRoute() })
+            Route.Favorites -> FavoritesScreen(vm, onBack = { popRoute() })
             Route.Playlists -> PlaylistsScreen(
               vm,
-              onBack = { stack.removeAt(stack.lastIndex) },
+              onBack = { popRoute() },
               onOpen = { stack.add(Route.Playlist(it)) },
             )
             is Route.Playlist -> PlaylistDetailScreen(
               vm, route.id,
-              onBack = { stack.removeAt(stack.lastIndex) },
+              onBack = { popRoute() },
               onOpenAlbum = { stack.add(Route.Album(it)) },
               onOpenArtist = { stack.add(Route.Artist(it)) },
             )
             is Route.Album -> AlbumScreen(
               vm, route.key,
-              onBack = { stack.removeAt(stack.lastIndex) },
+              onBack = { popRoute() },
               onOpenArtist = { stack.add(Route.Artist(it)) },
             )
             is Route.Artist -> ArtistScreen(
               vm, route.name,
-              onBack = { stack.removeAt(stack.lastIndex) },
+              onBack = { popRoute() },
               onOpenAlbum = { stack.add(Route.Album(it)) },
             )
-            Route.Equalizer -> EqualizerScreen(vm) { stack.removeAt(stack.lastIndex) }
-            Route.Account -> AccountScreen(vm) { stack.removeAt(stack.lastIndex) }
-            Route.Downloads -> DownloadsScreen(vm) { stack.removeAt(stack.lastIndex) }
-            Route.About -> AboutScreen { stack.removeAt(stack.lastIndex) }
+            Route.Equalizer -> EqualizerScreen(vm) { popRoute() }
+            Route.Account -> AccountScreen(vm) { popRoute() }
+            Route.Downloads -> DownloadsScreen(vm) { popRoute() }
+            Route.About -> AboutScreen { popRoute() }
           }
         }
       }

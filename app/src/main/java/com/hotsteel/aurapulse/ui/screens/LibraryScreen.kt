@@ -44,8 +44,6 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -89,6 +87,7 @@ import com.hotsteel.aurapulse.ui.components.AuraBackdrop
 import com.hotsteel.aurapulse.ui.components.EmptyState
 import com.hotsteel.aurapulse.ui.components.MixCard
 import com.hotsteel.aurapulse.ui.components.PageHeader
+import com.hotsteel.aurapulse.ui.components.PlaylistCard
 import com.hotsteel.aurapulse.ui.components.SectionHeader
 import com.hotsteel.aurapulse.ui.components.TrackRow
 import com.hotsteel.aurapulse.ui.theme.hueGradient
@@ -130,6 +129,7 @@ fun LibraryScreen(
   onOpenAlbum: (String) -> Unit,
   onOpenArtist: (String) -> Unit,
   onOpenDownloads: () -> Unit,
+  onOpenDiscover: () -> Unit,
 ) {
   val tracks by vm.tracks.collectAsStateWithLifecycle()
   val playlists by vm.playlists.collectAsStateWithLifecycle()
@@ -219,7 +219,9 @@ fun LibraryScreen(
           DropdownMenuItem(
             text = { Text(stringResource(R.string.library_import_url)) },
             leadingIcon = { Icon(Icons.Default.Link, null) },
-            onClick = { importMenu = false; onOpenSearch() },
+            // The add-URL dialog lives on Discover; the local search screen
+            // cannot add a stream and the item used to open exactly that.
+            onClick = { importMenu = false; onOpenDiscover() },
           )
         }
       }
@@ -282,6 +284,40 @@ fun LibraryScreen(
           )
         }
       } else {
+        // The playlists screen (create, rename, reorder, publish) had no entry
+        // point at all: the callbacks were passed in but never rendered. Keep
+        // the section visible even with no playlists so the create flow is
+        // reachable from a fresh library.
+        item("playlists") {
+          SectionHeader(
+            stringResource(R.string.playlists_title),
+            action = { TextButton(onClick = onOpenPlaylists) { Text(stringResource(R.string.see_all)) } },
+          )
+          if (playlists.isEmpty()) {
+            Text(
+              stringResource(R.string.no_playlists_yet),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.fillMaxWidth()
+                .clickable(onClick = onOpenPlaylists)
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            )
+          } else {
+            LazyRow(
+              contentPadding = PaddingValues(horizontal = 20.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              items(playlists.take(10), key = { it.id }) { playlist ->
+                PlaylistCard(
+                  playlist = playlist,
+                  trackCount = playlist.trackIds().size,
+                  onClick = { onOpenPlaylist(playlist.id) },
+                )
+              }
+            }
+          }
+        }
+
         item("mixes") {
           SectionHeader(stringResource(R.string.section_mixes))
           val mixes = listOf(
@@ -289,6 +325,7 @@ fun LibraryScreen(
             Triple(stringResource(R.string.mix_heavy), stringResource(R.string.mix_heavy_desc), hueGradient(28f)),
             Triple(stringResource(R.string.mix_forgotten), stringResource(R.string.mix_forgotten_desc), hueGradient(196f)),
             Triple(stringResource(R.string.mix_long), stringResource(R.string.mix_long_desc), hueGradient(300f)),
+            Triple(stringResource(R.string.mix_favorites), stringResource(R.string.mix_favorites_desc), hueGradient(330f)),
           )
           LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
@@ -297,17 +334,22 @@ fun LibraryScreen(
             items(mixes.size) { index ->
               val (title, subtitle, colors) = mixes[index]
               MixCard(title, subtitle, colors, onClick = {
-                val list = when (index) {
-                  0 -> tracks.sortedByDescending { it.addedAt }.take(30)
-                  1 -> tracks.sortedByDescending { stats[it.id]?.plays ?: 0 }.filter { (stats[it.id]?.plays ?: 0) > 0 }.take(30)
-                     .ifEmpty { tracks.sortedByDescending { stats[it.id]?.plays ?: 0 }.take(30) }
-                  2 -> tracks.filter { track ->
-                    val last = stats[track.id]?.lastPlayedAt ?: 0
-                    last == 0L || last < System.currentTimeMillis() - 21L * 24 * 3600 * 1000
-                  }.take(40)
-                  else -> tracks.filter { it.durationMs > 6 * 60_000 }.take(40)
+                if (index == mixes.lastIndex) {
+                  // The favourites screen had the same missing entry point.
+                  onOpenFavorites()
+                } else {
+                  val list = when (index) {
+                    0 -> tracks.sortedByDescending { it.addedAt }.take(30)
+                    1 -> tracks.sortedByDescending { stats[it.id]?.plays ?: 0 }.filter { (stats[it.id]?.plays ?: 0) > 0 }.take(30)
+                      .ifEmpty { tracks.sortedByDescending { stats[it.id]?.plays ?: 0 }.take(30) }
+                    2 -> tracks.filter { track ->
+                      val last = stats[track.id]?.lastPlayedAt ?: 0
+                      last == 0L || last < System.currentTimeMillis() - 21L * 24 * 3600 * 1000
+                    }.take(40)
+                    else -> tracks.filter { it.durationMs > 6 * 60_000 }.take(40)
+                  }
+                  if (list.isNotEmpty()) vm.play(list.first(), list) else vm.play(tracks.first(), tracks)
                 }
-                if (list.isNotEmpty()) vm.play(list.first(), list) else vm.play(tracks.first(), tracks)
               })
             }
           }
@@ -505,45 +547,31 @@ private fun StatChip(text: String) {
 @Composable
 private fun LibrarySegments(selected: LibraryTab, onSelect: (LibraryTab) -> Unit) {
   val options = listOf(LibraryTab.Albums, LibraryTab.Artists, LibraryTab.Tracks)
-  ButtonGroup(
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+  // Weighted toggle buttons, not ButtonGroup: the group's overflow measure
+  // copies constraints with maxWidth below the minWidth that fillMaxWidth pins,
+  // which crashes when the labels do not fit in the current locale.
+  Row(
+    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     horizontalArrangement = Arrangement.spacedBy(4.dp),
-    overflowIndicator = { menu -> ButtonGroupDefaults.OverflowIndicator(menu) },
   ) {
     options.forEach { option ->
-      customItem(
-        buttonGroupContent = {
-          ToggleButton(
-            checked = selected == option,
-            onCheckedChange = { onSelect(option) },
-            shapes = ToggleButtonDefaults.shapes(),
-            modifier = Modifier.height(42.dp),
-          ) {
-            Text(
-              when (option) {
-                LibraryTab.Albums -> stringResource(R.string.section_albums)
-                LibraryTab.Artists -> stringResource(R.string.section_artists)
-                LibraryTab.Tracks -> stringResource(R.string.section_tracks)
-              },
-              style = MaterialTheme.typography.labelLarge,
-            )
-          }
-        },
-        menuContent = { menu ->
-          DropdownMenuItem(
-            text = {
-              Text(
-                when (option) {
-                  LibraryTab.Albums -> stringResource(R.string.section_albums)
-                  LibraryTab.Artists -> stringResource(R.string.section_artists)
-                  LibraryTab.Tracks -> stringResource(R.string.section_tracks)
-                },
-              )
-            },
-            onClick = { menu.dismiss(); onSelect(option) },
-          )
-        },
-      )
+      ToggleButton(
+        checked = selected == option,
+        onCheckedChange = { onSelect(option) },
+        shapes = ToggleButtonDefaults.shapes(),
+        modifier = Modifier.weight(1f).height(42.dp),
+      ) {
+        Text(
+          when (option) {
+            LibraryTab.Albums -> stringResource(R.string.section_albums)
+            LibraryTab.Artists -> stringResource(R.string.section_artists)
+            LibraryTab.Tracks -> stringResource(R.string.section_tracks)
+          },
+          style = MaterialTheme.typography.labelLarge,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
     }
   }
 }

@@ -50,6 +50,8 @@
     <string name="mix_forgotten_desc">Not played in three weeks</string>
     <string name="mix_long">Long haul</string>
     <string name="mix_long_desc">Tracks over six minutes</string>
+    <string name="mix_favorites">Favorites</string>
+    <string name="mix_favorites_desc">Everything you starred</string>
     <string name="see_all">See all</string>
     <string name="sort">Sort</string>
     <string name="sort_added">Recently added</string>
@@ -301,6 +303,7 @@
     <string name="sync_needs_account">Sign in with GitHub first</string>
     <string name="sync_publishing">Publishing playlist…</string>
     <string name="sync_published">Playlist published as a gist</string>
+    <string name="playlist_publish">Publish as gist</string>
     <string name="sync_failed">Sync failed: %1$s</string>
     <string name="sync_no_backup">No AuraPulse backup found in this account</string>
     <string name="sync_device">Device</string>
@@ -313,7 +316,7 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
-    <string name="theme_black">AMOLED black</string>
+    <string name="theme_black">AMOLED</string>
     <string name="settings_palette">Palette</string>
     <string name="palette_aura">Aura</string>
     <string name="palette_ember">Ember</string>

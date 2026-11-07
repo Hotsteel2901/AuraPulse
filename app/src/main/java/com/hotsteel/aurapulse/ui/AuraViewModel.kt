@@ -400,14 +400,7 @@ class AuraViewModel @JvmOverloads constructor(
     controller?.let { if (index in 0 until it.mediaItemCount) it.removeMediaItem(index) }
   }
 
-  fun clearQueue() {
-    controller?.let {
-      val current = it.currentMediaItemIndex
-      if (it.mediaItemCount > 1) {
-        repeat(it.mediaItemCount) { index -> if (index != current && it.mediaItemCount > 1) it.removeMediaItem(if (index < current) index else current) }
-      }
-    }
-  }
+  fun clearQueue() = controller?.let(::clearQueueKeepingCurrent)
 
   private fun maybeRestoreSession() {
     if (restored) return
@@ -424,9 +417,15 @@ class AuraViewModel @JvmOverloads constructor(
         }
       }.getOrDefault(emptyList())
       val known = tracks.value.associateBy { it.id }
+      // Filtering out a file that disappeared shifts every later index. Follow
+      // the id that was actually playing instead of the old numeric position,
+      // or the app resumed a different song after a missing track.
+      val savedCurrentId = list.getOrNull(saved.index)
       val items = list.mapNotNull(known::get)
       if (items.isEmpty()) return@launch
-      player.setMediaItems(items.map(::mediaItem), saved.index.coerceIn(0, items.lastIndex), saved.positionMs)
+      val restoredIndex = items.indexOfFirst { it.id == savedCurrentId }
+        .takeIf { it >= 0 } ?: saved.index.coerceIn(0, items.lastIndex)
+      player.setMediaItems(items.map(::mediaItem), restoredIndex, saved.positionMs)
       player.prepare()
       refreshQueue(player)
       refresh(player)
@@ -707,7 +706,9 @@ class AuraViewModel @JvmOverloads constructor(
       val playlist = library.createPlaylist(imported.name)
       var added = 0
       val ids = mutableListOf<String>()
-      imported.entries.forEach { entry ->
+      // The playlist model caps its entries; stop importing at the same point
+      // so the reported count and the stored playlist agree.
+      imported.entries.take(com.hotsteel.aurapulse.data.library.LibraryRepository.MAX_PLAYLIST).forEach { entry ->
         if (!entry.url.startsWith("http")) return@forEach
         val track = TrackEntity(
           id = stableId("remote", entry.url), uri = entry.url, title = entry.title.take(200),
@@ -740,8 +741,10 @@ class AuraViewModel @JvmOverloads constructor(
             mutableDownloads.update { it + (track.id to DownloadProgress(bytes, total)) }
           }
         }
-        val fresh = library.tracksSnapshot().firstOrNull { it.id == track.id }
-        if (fresh != null) library.add(fresh.copy(downloadedPath = path))
+        // The track already exists; record the private copy with an UPDATE. Using
+        // add() here was a no-op because it is INSERT OR IGNORE, so the download
+        // finished but the library never knew about the file.
+        library.setDownloadedPath(track.id, path)
         notify(R.string.download_complete)
       } catch (e: CancellationException) {
         notify(R.string.download_cancelled); throw e
@@ -761,7 +764,7 @@ class AuraViewModel @JvmOverloads constructor(
 
   fun removeDownload(track: TrackEntity) = viewModelScope.launch {
     container.downloads.remove(track.downloadedPath)
-    library.add(track.copy(downloadedPath = null))
+    library.setDownloadedPath(track.id, null)
     notify(R.string.download_removed)
   }
 
@@ -994,7 +997,11 @@ class AuraViewModel @JvmOverloads constructor(
   }
 
   fun clearListening() = viewModelScope.launch {
+    // The dialog promises that resume positions are deleted too, so drop the
+    // room queue snapshot and the in-memory resume point as well as the events.
     library.clearListening()
+    library.clearQueueState()
+    listening.clearResume()
     listening.clearHistory()
     refreshInsights()
   }
@@ -1005,7 +1012,7 @@ class AuraViewModel @JvmOverloads constructor(
   fun setLanguage(tag: String) = settingsStore.setLanguage(tag)
   fun clearSearchHistory() = settingsStore.clearSearchHistory()
 
-  fun clearArtworkCache() {
+  fun clearArtworkCache() = viewModelScope.launch {
     library.clearArtworkCache()
     notify(R.string.settings_cache_cleared)
   }
@@ -1050,4 +1057,23 @@ class AuraViewModel @JvmOverloads constructor(
     openPlayerChannel.close()
     super.onCleared()
   }
+}
+
+/**
+ * Clears every queue item except the one currently playing.
+ *
+ * Removing an item shifts the indices that follow it. The previous
+ * implementation removed items in ascending order while reusing the index that
+ * was current before the first removal, so on anything but a two-item queue it
+ * deleted the playing track (and left a stray one). Removing from the end down
+ * to the current item first, then from just before the current item down to
+ * zero, keeps every index valid as the list shrinks and leaves the playing
+ * track as the only entry.
+ */
+internal fun clearQueueKeepingCurrent(player: Player) {
+  val keep = player.currentMediaItemIndex
+  val count = player.mediaItemCount
+  if (keep < 0 || count <= 1) return
+  for (index in count - 1 downTo keep + 1) player.removeMediaItem(index)
+  for (index in keep - 1 downTo 0) player.removeMediaItem(index)
 }

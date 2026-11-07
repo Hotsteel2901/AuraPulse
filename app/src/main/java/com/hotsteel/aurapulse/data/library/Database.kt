@@ -39,6 +39,9 @@ interface AuraDao {
   @Query("UPDATE tracks SET missing = :missing WHERE id = :id")
   suspend fun setMissing(id: String, missing: Boolean)
 
+  @Query("UPDATE tracks SET downloadedPath = :path WHERE id = :id")
+  suspend fun setDownloadedPath(id: String, path: String?)
+
   @Query("DELETE FROM tracks WHERE id = :id")
   suspend fun deleteTrack(id: String)
 
@@ -86,6 +89,9 @@ interface AuraDao {
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun putQueueState(state: QueueStateEntity)
+
+  @Query("DELETE FROM queue_state")
+  suspend fun clearQueueState()
 }
 
 @Database(

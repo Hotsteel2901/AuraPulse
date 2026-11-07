@@ -43,8 +43,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -280,28 +278,26 @@ private fun SourceSelector(selected: DiscoverySource, onSelect: (DiscoverySource
     DiscoverySource.RADIO to R.string.source_radio,
     DiscoverySource.CUSTOM to R.string.source_custom,
   )
-  ButtonGroup(
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+  // Same fix as the Settings theme picker: ButtonGroup's overflow measure
+  // crashes when fillMaxWidth pins minWidth and the labels overflow.
+  Row(
+    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
     horizontalArrangement = Arrangement.spacedBy(4.dp),
-    overflowIndicator = { menu -> ButtonGroupDefaults.OverflowIndicator(menu) },
   ) {
     sources.forEach { (source, label) ->
-      customItem(
-        buttonGroupContent = {
-          ToggleButton(
-            checked = selected == source,
-            onCheckedChange = { onSelect(source) },
-            shapes = ToggleButtonDefaults.shapes(),
-            modifier = Modifier.height(44.dp),
-          ) { Text(stringResource(label), style = MaterialTheme.typography.labelLarge) }
-        },
-        menuContent = { menu ->
-          androidx.compose.material3.DropdownMenuItem(
-            text = { Text(stringResource(label)) },
-            onClick = { menu.dismiss(); onSelect(source) },
-          )
-        },
-      )
+      ToggleButton(
+        checked = selected == source,
+        onCheckedChange = { onSelect(source) },
+        shapes = ToggleButtonDefaults.shapes(),
+        modifier = Modifier.weight(1f).height(44.dp),
+      ) {
+        Text(
+          stringResource(label),
+          style = MaterialTheme.typography.labelLarge,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
     }
   }
 }

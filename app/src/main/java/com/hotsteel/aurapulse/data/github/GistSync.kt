@@ -179,8 +179,13 @@ class GistSync(
   private fun buildPayload(tracks: List<TrackEntity>, playlists: List<PlaylistEntity>, favorites: Set<String>): JSONObject {
     val trackArray = JSONArray()
     tracks.forEach { track ->
+      // A local track's uri is a content:// document grant or an app-private
+      // path. The documented privacy boundary says neither ever leaves the
+      // device, so only playable remote URLs are serialised.
       trackArray.put(JSONObject()
-        .put("id", track.id).put("uri", track.uri).put("title", track.title)
+        .put("id", track.id)
+        .put("uri", if (track.source == Source.LOCAL) "" else track.uri)
+        .put("title", track.title)
         .put("artist", track.artist).put("album", track.album).put("albumArtist", track.albumArtist)
         .put("durationMs", track.durationMs).put("source", track.source).put("addedAt", track.addedAt)
         .put("trackNumber", track.trackNumber).put("year", track.year).put("mimeType", track.mimeType)

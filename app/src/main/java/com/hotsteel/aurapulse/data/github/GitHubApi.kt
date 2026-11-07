@@ -63,6 +63,21 @@ class GitHubException(
  * Minimal, dependency-free GitHub REST client. Only the endpoints AuraPulse
  * actually uses are implemented; every call goes straight to api.github.com.
  */
+private const val GITHUB_API = "https://api.github.com/"
+
+/**
+ * Builds an api.github.com URL with real query parameters.
+ *
+ * `addPathSegments("gists?per_page=100")` percent-encodes the question mark, so
+ * the old request went to `/gists%3Fper_page=100` and every first-time backup or
+ * restore died with HTTP 404. Query arguments now go through the URL builder.
+ */
+internal fun githubApiUrl(path: String, query: Map<String, String> = emptyMap()): okhttp3.HttpUrl =
+  GITHUB_API.toHttpUrl().newBuilder().apply {
+    addPathSegments(path.removePrefix("/"))
+    query.forEach { (name, value) -> addQueryParameter(name, value) }
+  }.build()
+
 class GitHubApi(
   private val client: OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(15, TimeUnit.SECONDS)
@@ -72,9 +87,9 @@ class GitHubApi(
 ) {
   private val json = "application/json; charset=utf-8".toMediaType()
 
-  private fun request(path: String, token: String?): Request.Builder =
+  private fun request(path: String, token: String?, query: Map<String, String> = emptyMap()): Request.Builder =
     Request.Builder()
-      .url(API.toHttpUrl().newBuilder().addPathSegments(path.removePrefix("/")).build())
+      .url(githubApiUrl(path, query))
       .header("Accept", "application/vnd.github+json")
       .header("X-GitHub-Api-Version", "2022-11-28")
       .apply { token?.let { header("Authorization", "Bearer $it") } }
@@ -115,7 +130,7 @@ class GitHubApi(
 
   /** Lists gists; the payload is a JSON array, so it is parsed separately. */
   suspend fun listGists(token: String, perPage: Int = 100): List<GitHubGist> = withContext(Dispatchers.IO) {
-    val request = request("gists?per_page=$perPage", token).get().build()
+    val request = request("gists", token, mapOf("per_page" to perPage.toString())).get().build()
     val body = runCatching {
       client.newCall(request).execute().use { response ->
         val text = response.body?.string().orEmpty()
@@ -255,9 +270,5 @@ class GitHubApi(
       isPublic = optBoolean("public", false),
       files = files,
     )
-  }
-
-  private companion object {
-    const val API = "https://api.github.com/"
   }
 }

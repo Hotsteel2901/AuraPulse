@@ -165,7 +165,7 @@ fun PlaylistDetailScreen(
           DropdownMenuItem(text = { Text(stringResource(R.string.playlist_duplicate)) }, onClick = {
             vm.duplicatePlaylist(playlist.id); menu = false
           })
-          DropdownMenuItem(text = { Text(stringResource(R.string.sync_published)) }, onClick = {
+          DropdownMenuItem(text = { Text(stringResource(R.string.playlist_publish)) }, onClick = {
             publishing = true; menu = false
           })
           DropdownMenuItem(text = { Text(stringResource(R.string.delete)) }, onClick = {
@@ -243,7 +243,7 @@ fun PlaylistDetailScreen(
   if (publishing) {
     AlertDialog(
       onDismissRequest = { publishing = false },
-      title = { Text(stringResource(R.string.sync_published)) },
+      title = { Text(stringResource(R.string.playlist_publish)) },
       text = { Text("Creates a secret gist containing this playlist as .m3u. Sign-in required.") },
       confirmButton = {
         TextButton(onClick = { vm.publishPlaylist(playlist, false); publishing = false }) { Text(stringResource(R.string.sync_push)) }

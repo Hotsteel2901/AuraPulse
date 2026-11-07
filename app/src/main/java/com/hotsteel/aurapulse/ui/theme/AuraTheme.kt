@@ -238,7 +238,14 @@ fun AuraTheme(
     ThemeMode.DARK, ThemeMode.BLACK -> true
     ThemeMode.SYSTEM -> systemDark
   }
-  val dynamic = if (settings.dynamicColor) rememberDynamicScheme(dark) else null
+  // AMOLED black is an explicit surface promise; wallpaper colours would
+  // replace the pure-black surfaces, so that mode always uses the curated
+  // scheme even while dynamic colour is enabled (the default).
+  val dynamic = if (settings.dynamicColor && settings.theme != ThemeMode.BLACK) {
+    rememberDynamicScheme(dark)
+  } else {
+    null
+  }
   val scheme = dynamic ?: remember(settings, dark) { auraScheme(settings, dark) }
   val context = LocalContext.current
   // None of these are cheap: the motion scheme reads a system setting over IPC,

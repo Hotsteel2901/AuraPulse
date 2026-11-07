@@ -25,8 +25,6 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -128,10 +126,14 @@ fun SettingsScreen(
       SurfaceCard(Modifier.padding(horizontal = 20.dp)) {
         Text(stringResource(R.string.settings_theme_mode), style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(8.dp))
-        ButtonGroup(
-          modifier = Modifier.fillMaxWidth(),
+        // A weighted Row of toggle buttons, not ButtonGroup: the experimental
+        // group's overflow path copies incoming constraints with a smaller
+        // maxWidth, and fillMaxWidth left minWidth at the full width. With the
+        // longer Chinese labels the group overflowed, the copy was invalid and
+        // opening Settings crashed in ButtonGroupMeasurePolicy.
+        Row(
+          Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(4.dp),
-          overflowIndicator = { menu -> ButtonGroupDefaults.OverflowIndicator(menu) },
         ) {
           listOf(
             ThemeMode.SYSTEM to R.string.theme_system,
@@ -139,22 +141,19 @@ fun SettingsScreen(
             ThemeMode.DARK to R.string.theme_dark,
             ThemeMode.BLACK to R.string.theme_black,
           ).forEach { (mode, label) ->
-            customItem(
-              buttonGroupContent = {
-                ToggleButton(
-                  checked = settings.theme == mode,
-                  onCheckedChange = { vm.updateSettings { it.copy(theme = mode) } },
-                  shapes = ToggleButtonDefaults.shapes(),
-                  modifier = Modifier.height(40.dp),
-                ) { Text(stringResource(label), style = MaterialTheme.typography.labelMedium, maxLines = 1) }
-              },
-              menuContent = { menu ->
-                androidx.compose.material3.DropdownMenuItem(
-                  text = { Text(stringResource(label)) },
-                  onClick = { menu.dismiss(); vm.updateSettings { it.copy(theme = mode) } },
-                )
-              },
-            )
+            ToggleButton(
+              checked = settings.theme == mode,
+              onCheckedChange = { vm.updateSettings { it.copy(theme = mode) } },
+              shapes = ToggleButtonDefaults.shapes(),
+              modifier = Modifier.weight(1f).height(40.dp),
+            ) {
+              Text(
+                stringResource(label),
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
           }
         }
 
@@ -361,8 +360,10 @@ fun SettingsScreen(
       title = { Text(stringResource(R.string.settings_language)) },
       text = {
         Column {
-          listOf("system" to R.string.language_system, "en" to null, "zh-CN" to null, "zh-TW" to null,
-            "ja" to null, "ko" to null, "es" to null, "de" to null).forEach { (tag, label) ->
+          // Only the two shipped resource sets, plus "follow system". The old
+          // list offered five locales that have no translations, so choosing
+          // them silently fell back to English.
+          listOf("system" to R.string.language_system, "en" to null, "zh-CN" to null).forEach { (tag, label) ->
             Row(
               Modifier.fillMaxWidth().clickable {
                 onChangeLanguage(tag)

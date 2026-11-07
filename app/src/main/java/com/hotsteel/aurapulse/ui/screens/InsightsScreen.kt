@@ -128,7 +128,10 @@ fun InsightsScreen(vm: AuraViewModel) {
                 add(Calendar.DAY_OF_YEAR, -(6 - index))
               }.get(Calendar.DAY_OF_WEEK)
               Text(
-                fmt.weekdayInitial((label + 5) % 7),
+                // Calendar.DAY_OF_WEEK is 1..7 with Sunday first, which is the
+                // order weekdayInitial's table uses; the old +5 rotation made
+                // every letter name the previous day.
+                fmt.weekdayInitial(label - 1),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )

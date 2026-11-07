@@ -54,7 +54,15 @@ android {
     debug {
       applicationIdSuffix = ".debug"
       versionNameSuffix = "-debug"
-      signingConfig = signingConfigs.getByName("debugConfig")
+      // The repository ships debug.keystore so local builds and CI artifacts
+      // share one identity (an artifact can then update the previous install).
+      // If someone removed it, fall back to AGP's standard debug key instead of
+      // failing validateSigningDebug on a fresh clone.
+      signingConfig = if (file("${rootDir}/debug.keystore").exists()) {
+        signingConfigs.getByName("debugConfig")
+      } else {
+        signingConfigs.getByName("debug")
+      }
     }
   }
   compileOptions {

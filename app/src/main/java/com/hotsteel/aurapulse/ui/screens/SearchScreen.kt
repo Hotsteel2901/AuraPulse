@@ -1,5 +1,6 @@
 package com.hotsteel.aurapulse.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -128,7 +129,7 @@ fun SearchScreen(
           SectionHeader(stringResource(R.string.section_albums))
           LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(albums, key = { it.key }) { album ->
-              Column(Modifier.width(120.dp).padding(vertical = 4.dp)) {
+              Column(Modifier.width(120.dp).clickable { onOpenAlbum(album.key) }.padding(vertical = 4.dp)) {
                 com.hotsteel.aurapulse.ui.components.Artwork(album.tracks.firstOrNull(), 120.dp, corner = 18.dp)
                 Text(album.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
                 Text(

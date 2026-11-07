@@ -25,7 +25,10 @@ class PlaylistImporter(
 ) {
   suspend fun fetch(rawUrl: String): ImportedPlaylist = withContext(Dispatchers.IO) {
     val url = rawUrl.trim().toHttpUrlOrNull() ?: throw IOException("invalid url")
-    if (!url.isHttps && !url.host.endsWith("githubusercontent.com")) throw IOException("https required")
+    // The suffix test must end on a label boundary: "evilgithubusercontent.com"
+    // is not GitHub, and a bare endsWith() would let it through over cleartext.
+    val githubHost = url.host == "githubusercontent.com" || url.host.endsWith(".githubusercontent.com")
+    if (!url.isHttps && !githubHost) throw IOException("https required")
     val request = Request.Builder().url(url).header("User-Agent", "AuraPulse/2.0").build()
     val body = client.newCall(request).execute().use { response ->
       if (!response.isSuccessful) throw IOException("HTTP ${response.code}")

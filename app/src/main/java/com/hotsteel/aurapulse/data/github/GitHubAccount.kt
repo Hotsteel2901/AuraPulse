@@ -41,14 +41,20 @@ class GitHubAccount(context: Context) {
   val session: GitHubSession? get() = (mutable.value as? AuthState.SignedIn)?.session
 
   init {
-    val token = secure.get()
-    if (token.isNullOrBlank()) {
-      mutable.value = AuthState.SignedOut
-    } else {
-      // Render the cached profile immediately, then refresh it in the background.
-      val cached = readCache()
-      mutable.value = if (cached != null) AuthState.SignedIn(GitHubSession(token, cached)) else AuthState.Restoring
-      scope.launch { refresh(token) }
+    // Never touch the Android Keystore from Application.onCreate's main thread.
+    // Unwrapping the token is a keystore-daemon binder call; on a device whose
+    // keystore is slow (or wedged, as vendor builds can be) it delayed the first
+    // frame for seconds. The UI already renders AuthState.Restoring.
+    scope.launch {
+      val token = secure.get()
+      if (token.isNullOrBlank()) {
+        mutable.value = AuthState.SignedOut
+      } else {
+        // Render the cached profile immediately, then refresh it in the background.
+        val cached = readCache()
+        mutable.value = if (cached != null) AuthState.SignedIn(GitHubSession(token, cached)) else AuthState.Restoring
+        refresh(token)
+      }
     }
   }
 

@@ -64,10 +64,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.hotsteel.aurapulse.R
 import com.hotsteel.aurapulse.core.SafeHaptics
 import com.hotsteel.aurapulse.core.fmt
 import com.hotsteel.aurapulse.data.library.PlaylistEntity
@@ -422,6 +423,10 @@ fun PlaylistCard(playlist: PlaylistEntity, trackCount: Int, onClick: () -> Unit,
     }
     Spacer(Modifier.height(8.dp))
     Text(playlist.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    Text("$trackCount tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(
+      stringResource(R.string.library_tracks_count, trackCount),
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }

@@ -16,7 +16,6 @@ node_modules/
 .cxx
 local.properties
 .env
-debug.keystore
 /debug.keystore.base64
 *-debug.log
 
@@ -24,6 +23,9 @@ debug.keystore
 app/google-services.json
 app/google-services.base64
 
-# Release signing material is never committed
+# Release signing material is never committed. The debug key is public by
+# convention (README documents alias/password) and is shipped so that a fresh
+# clone builds and consecutive CI artifacts update the same install.
 *.jks
 *.keystore
+!debug.keystore

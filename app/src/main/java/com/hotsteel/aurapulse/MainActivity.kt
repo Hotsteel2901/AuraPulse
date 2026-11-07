@@ -32,6 +32,45 @@ import com.hotsteel.aurapulse.ui.AuraRoot
 import com.hotsteel.aurapulse.ui.AuraViewModel
 import java.util.Locale
 
+/** What an external intent asks AuraPulse to do. */
+sealed interface DeepLinkTarget {
+  data class Import(val uri: Uri) : DeepLinkTarget
+  data class Stream(val name: String, val url: String) : DeepLinkTarget
+  data object Ignore : DeepLinkTarget
+}
+
+/**
+ * Turns a VIEW/SEND payload into one action without touching the UI.
+ *
+ * Kept separate so the hostile-input cases can be unit tested: an opaque
+ * `aurapulse:foo` URI is not hierarchical and `Uri.getQueryParameter` throws
+ * `UnsupportedOperationException` on it, which used to crash onCreate.
+ */
+fun resolveDeepLink(action: String?, data: Uri?, stream: Uri?): DeepLinkTarget {
+  val uri = when (action) {
+    Intent.ACTION_SEND -> stream
+    Intent.ACTION_VIEW -> data
+    else -> null
+  } ?: return DeepLinkTarget.Ignore
+  return when (uri.scheme) {
+    "content" -> DeepLinkTarget.Import(uri)
+    "http", "https" -> {
+      val name = uri.lastPathSegment?.substringBeforeLast('.')?.ifBlank { null } ?: uri.host ?: "Stream"
+      DeepLinkTarget.Stream(name, uri.toString())
+    }
+    "aurapulse" -> {
+      if (!uri.isHierarchical) {
+        DeepLinkTarget.Ignore
+      } else {
+        uri.getQueryParameter("url")?.let {
+          DeepLinkTarget.Stream(uri.getQueryParameter("title") ?: "Shared link", it)
+        } ?: DeepLinkTarget.Ignore
+      }
+    }
+    else -> DeepLinkTarget.Ignore
+  }
+}
+
 class MainActivity : ComponentActivity() {
   // Explicit factory: AndroidViewModelFactory looks for a single-argument
   // (Application) constructor by reflection, which Kotlin default parameters do
@@ -104,27 +143,24 @@ class MainActivity : ComponentActivity() {
   }
 
   private fun applyLanguage(tag: String) {
-    SettingsStore(this).setLanguage(tag)
+    // Update the process-wide store, not a throwaway instance. The ViewModel's
+    // copy is retained across recreate(), and a stale copy wrote the old
+    // language back the next time any other setting changed.
+    AuraApp.container.settings.setLanguage(tag)
     recreate()
   }
 
   /** Share targets, VIEW intents and aurapulse:// deep links all land here. */
   private fun handleIntent(intent: Intent?) {
     intent ?: return
-    val uri = when (intent.action) {
-      Intent.ACTION_SEND -> intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
-      Intent.ACTION_VIEW -> intent.data
-      else -> null
-    } ?: return
-    when (uri.scheme) {
-      "content" -> viewModel.importUris(listOf(uri))
-      "http", "https" -> {
-        val name = uri.lastPathSegment?.substringBeforeLast('.')?.ifBlank { null } ?: uri.host ?: "Stream"
-        viewModel.addDirectUrl(name, uri.toString())
-      }
-      "aurapulse" -> uri.getQueryParameter("url")?.let {
-        viewModel.addDirectUrl(uri.getQueryParameter("title") ?: "Shared link", it)
-      }
+    when (val target = resolveDeepLink(
+      intent.action,
+      intent.data,
+      intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri,
+    )) {
+      is DeepLinkTarget.Import -> viewModel.importUris(listOf(target.uri))
+      is DeepLinkTarget.Stream -> viewModel.addDirectUrl(target.name, target.url)
+      DeepLinkTarget.Ignore -> Unit
     }
   }
 

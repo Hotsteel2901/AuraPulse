@@ -33,6 +33,15 @@ class PlaybackService : MediaSessionService() {
   private var player: ExoPlayer? = null
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+  /**
+   * Final queue and listening writes get their own scope. They must survive
+   * [onDestroy]: cancelling [scope] right after launching them, as the service
+   * used to do, marked each job cancelled before it reached the database, so the
+   * resume snapshot and the last listening interval were lost on every teardown.
+   * The jobs are short and hold only values already copied off the player.
+   */
+  private val writes = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
   private var currentTrackId: String? = null
   private var listeningSince: Long = 0
   private var listenedMs: Long = 0
@@ -63,6 +72,16 @@ class PlaybackService : MediaSessionService() {
           currentTrackId = it
           AuraApp.container.listening.recordHistory(it)
         }
+        // "End of current track" used to look only at STATE_ENDED, which never
+        // happens while another item follows or repeat is on, so the timer kept
+        // playing through the whole queue. The automatic transition (including
+        // repeat-one, which reports REPEAT) is the real end of the track.
+        if (SleepTimer.state.value.atTrackEnd &&
+          (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)
+        ) {
+          player?.pause()
+          SleepTimer.cancel()
+        }
       }
 
       override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -71,9 +90,10 @@ class PlaybackService : MediaSessionService() {
         } else {
           commitListening()
           persistQueue()
-          publishWidget()
         }
-        publishWidget()
+        // Forced: the throttle used to swallow exactly the pause that has to
+        // reach the widget, leaving it on "playing" until the next event.
+        publishWidget(force = true)
       }
 
       override fun onEvents(player: Player, events: Player.Events) {
@@ -124,8 +144,12 @@ class PlaybackService : MediaSessionService() {
           exo.pause()
           SleepTimer.cancel()
         }
-        // A cancelled timer (or a finished fade) must never leave the player quiet.
-        if (sleep.endsAt == null && !sleep.fading) {
+        // Any moment outside the fade window must use the real player volume.
+        // The old check only restored it when no timer existed at all, so
+        // starting a new timer during the previous fade left the player quiet
+        // for the whole new timer.
+        val fadingNow = sleep.endsAt != null && (sleep.remainingMs() ?: 0) <= SleepTimer.fadeWindowMs
+        if (!fadingNow) {
           val target = PlaybackEnhancements.state.value.volume
           if (kotlin.math.abs(exo.volume - target) > 0.001f) exo.volume = target
         }
@@ -138,10 +162,10 @@ class PlaybackService : MediaSessionService() {
 
   private var lastWidgetPublish = 0L
 
-  private fun publishWidget() {
+  private fun publishWidget(force: Boolean = false) {
     val exo = player ?: return
     val now = System.currentTimeMillis()
-    if (now - lastWidgetPublish < 700) return
+    if (!force && now - lastWidgetPublish < 700) return
     lastWidgetPublish = now
     val metadata = exo.currentMediaItem?.mediaMetadata
     val artwork = metadata?.artworkUri?.takeIf { it.scheme == "file" }?.toString()
@@ -169,7 +193,7 @@ class PlaybackService : MediaSessionService() {
       val duration = player?.duration?.takeIf { it > 0 } ?: 0
       val position = player?.currentPosition ?: 0
       val completed = duration > 0 && position >= duration - 3000
-      scope.launch(Dispatchers.IO) { AuraApp.container.library.recordPlay(id, delta, completed) }
+      writes.launch { AuraApp.container.library.recordPlay(id, delta, completed) }
     }
   }
 
@@ -186,7 +210,7 @@ class PlaybackService : MediaSessionService() {
     val index = exo.currentMediaItemIndex.coerceAtLeast(0)
     val position = exo.currentPosition.coerceAtLeast(0)
     val current = exo.currentMediaItem?.mediaId
-    scope.launch(Dispatchers.IO) {
+    writes.launch {
       AuraApp.container.library.saveQueue(ids, index, position)
       if (current != null) AuraApp.container.listening.rememberResume(current, position, ids)
     }

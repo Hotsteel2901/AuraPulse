@@ -67,6 +67,11 @@ object MainThreadWatchdog {
         // "unresponsive for 1522176 ms" report that sent the investigation after
         // an innocent notification update.
         if (drift > 2_500) {
+          // The whole process (including the heartbeat) was suspended. Rebase
+          // the heartbeat as well: otherwise the very next poll still compares
+          // against the pre-suspension beat and manufactures a multi-minute
+          // stall out of the resume.
+          lastBeat.set(now)
           strikes = 0
           continue
         }

@@ -74,7 +74,7 @@ python3 tools/check_locales.py        # 校验各语言资源键与格式参数�
 
 `debug.keystore` 已随仓库提供（别名 `androiddebugkey`，密码 `android`），仅用于本地调试。release 构建需要自行提供 `KEYSTORE_PATH` / `STORE_PASSWORD` / `KEY_PASSWORD`。
 
-当前状态：`:app:assembleDebug` 与 `:app:testDebugUnitTest`（26 个用例）在本机通过。仓库**没有**在真实设备或模拟器上跑过自动化播放测试，涉及音频输出的行为请以真机为准。
+当前状态：`:app:assembleDebug`、`:app:testDebugUnitTest`（63 个用例）与 `:app:lintDebug` 在本机通过。仓库**没有**在真实设备或模拟器上跑过自动化播放测试，涉及音频输出的行为请以真机为准。
 
 ### 代码结构
 
@@ -153,7 +153,7 @@ python3 tools/check_locales.py
 
 A debug keystore is included for local builds. Release builds need `KEYSTORE_PATH`, `STORE_PASSWORD` and `KEY_PASSWORD`.
 
-Status: `:app:assembleDebug` and `:app:testDebugUnitTest` (26 cases) pass locally. There is **no** automated on-device playback test in this repository; anything involving audio output should be verified on a real device.
+Status: `:app:assembleDebug`, `:app:testDebugUnitTest` (63 cases) and `:app:lintDebug` pass locally. There is **no** automated on-device playback test in this repository; anything involving audio output should be verified on a real device.
 
 ### Licence
 

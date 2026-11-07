@@ -167,6 +167,10 @@ fun NowPlayingScreen(
     Modifier
       .fillMaxSize()
       .background(surfaceColor)
+      // The player is an overlay above the tab content. Without a pointer
+      // handler here, taps on its empty areas fell through to the hidden
+      // library rows and started the track underneath.
+      .pointerInput(Unit) { detectTapGestures { } }
       // Cached display list: the artwork wash is rebuilt only when the palette or
       // the size changes, never on the frame clock.
       .drawWithCache {
